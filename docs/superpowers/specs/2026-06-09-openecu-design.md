@@ -1,8 +1,14 @@
-# TuneECU Cross-Platform Rebuild — Design Spec
+# OpenECU — Cross-Platform Rebuild — Design Spec
+
+> **OpenECU** is a clean-room, cross-platform successor to the discontinued **TuneECU**
+> Windows app. Throughout this document, "OpenECU" is the new project we are building and
+> "TuneECU" refers to the original proprietary application we are replacing.
 
 - **Date:** 2026-06-09
 - **Status:** Approved (design); pending implementation plan
 - **Author:** Michael Neumann (with Claude)
+- **Repo:** <https://github.com/srccd-dev/OpenECU> (public)
+- **License:** MIT
 
 ---
 
@@ -65,10 +71,13 @@ extends this capability for the community, hosted on the user's GitHub.
 | v1 capabilities | **Read-only diagnostics** (no flashing) |
 | v1 transports | FTDI K-line **+** ELM327-over-SPP; BLE deferred |
 | Solution structure | Approach A — core-first layered solution |
+| Project name | **OpenECU** |
+| Repository | `srccd-dev/OpenECU` — **public** |
+| License | **MIT** |
 
 ## 4. Approach (chosen: A — core-first layered solution)
 
-A headless, fully testable `TuneEcu.Core` holds the protocol engine, ECU-definition model,
+A headless, fully testable `OpenEcu.Core` holds the protocol engine, ECU-definition model,
 and map parser. Native comms sit behind a transport interface. The Avalonia UI is a thin
 consumer. This isolates the riskiest part (cross-platform comms) behind an interface and
 lets it be test-driven against captured/simulated traffic — so we never debug protocol and
@@ -80,20 +89,20 @@ UI simultaneously.
 ## 5. Solution / repo layout
 
 ```
-tuneecu-x/   (new GitHub repo — final name TBD, must NOT be "TuneECU", see §9)
+OpenECU/   (public repo: github.com/srccd-dev/OpenECU)
 ├─ src/
-│  ├─ TuneEcu.Core/              # headless, cross-platform. NO UI, NO native deps
+│  ├─ OpenEcu.Core/              # headless, cross-platform. NO UI, NO native deps
 │  │   ├─ Transport/             # IEcuTransport abstraction (byte stream)
 │  │   ├─ Adapters/              # IEcuAdapter: KLineProtocol | Elm327Adapter
 │  │   ├─ Protocol/              # ISO9141/KWP2000 framing, checksum, init state machine
 │  │   ├─ Ecu/                   # EcuDefinition model + SagemMc1000Definition
 │  │   ├─ Maps/                  # community map-file parser/model (reverse-engineered)
 │  │   └─ Diagnostics/           # sensors, fault codes, services
-│  ├─ TuneEcu.Transport.Ftdi/    # FTDI D2XX wrapper (cross-platform libftd2xx)
-│  ├─ TuneEcu.Transport.Serial/  # System.IO.Ports VCP (USB-serial + BT-Classic COM)
-│  ├─ TuneEcu.Transport.Bluetooth/ # BT-Classic discovery/pairing (32feet.NET on Win)
-│  └─ TuneEcu.App/               # Avalonia MVVM UI
-├─ tests/TuneEcu.Core.Tests/     # xUnit + simulated/replay ECU
+│  ├─ OpenEcu.Transport.Ftdi/    # FTDI D2XX wrapper (cross-platform libftd2xx)
+│  ├─ OpenEcu.Transport.Serial/  # System.IO.Ports VCP (USB-serial + BT-Classic COM)
+│  ├─ OpenEcu.Transport.Bluetooth/ # BT-Classic discovery/pairing (32feet.NET on Win)
+│  └─ OpenEcu.App/               # Avalonia MVVM UI
+├─ tests/OpenEcu.Core.Tests/     # xUnit + simulated/replay ECU
 ├─ docs/                         # protocol notes, CLEANROOM.md, map-format notes
 └─ _reference/   (GIT-IGNORED, NEVER published — decompiled code lives here)
 ```
@@ -144,7 +153,7 @@ simulator and/or community testers with newer bikes.
   from the decompiled `ISORead.cs` — re-implemented as fresh, documented code.
 - `EcuDefinition`: describes one ECU — init type, memory map, sensor table (PID → scaling),
   fault-code table, map layout. `SagemMc1000Definition` is the first plugin.
-- Map (`TuneEcu.Core/Maps`): reverse-engineer the tune-file format from `TuneLibrary.Tune`;
+- Map (`OpenEcu.Core/Maps`): reverse-engineer the tune-file format from `TuneLibrary.Tune`;
   implement a fresh loader for community map files. A helper points users at the community
   database; **nothing is bundled.**
 
@@ -158,12 +167,13 @@ simulator and/or community testers with newer bikes.
 
 ## 9. GitHub, licensing & clean-room hygiene
 
-- **New name** (not "TuneECU" — avoid trademark). Final name TBD.
+- **Name: OpenECU** (deliberately not "TuneECU" — avoids the original's trademark).
+- **Repo:** <https://github.com/srccd-dev/OpenECU> — **public**, open source.
+- **License: MIT** (already on the repo).
 - `docs/CLEANROOM.md` documenting that only observable behavior was referenced; decompiled
   code is git-ignored (`_reference/`, `_decompiled/`) and never published.
 - README carries a prominent **"use at your own risk / no manufacturer affiliation"**
   disclaimer (mirrors the community database's terms).
-- License: TBD (GPL-3.0 vs MIT) — decide before public release.
 - Original binaries and decompiled output are git-ignored from commit #1 (see `.gitignore`).
 
 ## 10. Roadmap / phasing
@@ -196,8 +206,10 @@ simulator and/or community testers with newer bikes.
 - **ECU safety** — even read operations touch a live ECU. **Mitigation:** read-only v1;
   flashing only after comms hardening (Phase 3).
 
-## 12. Open questions (resolve before/within implementation)
+## 12. Open questions
 
-- Final project/app name and license (GPL-3.0 vs MIT).
-- Public vs private repo for the initial development period.
-- Whether to contact the original author for permission/relicensing.
+Resolved: name = **OpenECU**; repo = **public** `srccd-dev/OpenECU`; license = **MIT**.
+
+Remaining (optional, non-blocking):
+- Whether to contact the original TuneECU author as a courtesy / for blessing. Not required
+  for a clean-room MIT project, but good community etiquette.
