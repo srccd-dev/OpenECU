@@ -1,0 +1,26 @@
+# ----------------------------------------------------------------------------
+# Provenance protection — NEVER commit or publish the original proprietary
+# binaries or anything decompiled from them. These are reference-only and must
+# stay off GitHub (copyright / clean-room hygiene). See docs/CLEANROOM.md.
+# ----------------------------------------------------------------------------
+_reference/
+_decompiled/
+TuneECU v2.5.8/
+__MACOSX/
+*.exe
+*.dll
+
+# macOS / Windows cruft
+.DS_Store
+Thumbs.db
+
+# .NET build output
+bin/
+obj/
+*.user
+.vs/
+
+# Tooling
+.idea/
+.claude/
+.remember/
