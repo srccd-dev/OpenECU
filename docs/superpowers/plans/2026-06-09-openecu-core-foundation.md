@@ -267,8 +267,8 @@ public class KLineFrameBuilderTests
     public void Iso9141_multibyte_payload_sets_format_byte_to_0x80_or_length()
     {
         byte[] frame = KLineFrameBuilder.BuildRequest(new byte[] { 0x10, 0x20, 0x30 }, KLineMode.Iso9141);
-        // 0x80|3 = 0x83 ; checksum = 0x83+0xD5+0xF5+0x10+0x20+0x30 = 0x2FD -> 0xFD
-        frame.Should().Equal(0x83, 0xD5, 0xF5, 0x10, 0x20, 0x30, 0xFD);
+        // 0x80|3 = 0x83 ; checksum = 0x83+0xD5+0xF5+0x10+0x20+0x30 = 0x2AD -> 0xAD
+        frame.Should().Equal(0x83, 0xD5, 0xF5, 0x10, 0x20, 0x30, 0xAD);
     }
 
     [Fact]
@@ -674,9 +674,18 @@ public class KLineRoundTripTests
         int n = await transport.ReadAsync(buffer);
         n.Should().Be(response.Length);
 
-        KLineFrameParser.TryParse(buffer.AsSpan(0, n), KLineMode.Kwp2000, out var payload)
-            .Should().BeTrue();
-        payload.ToArray().Should().Equal(0xC1, 0xEA, 0x8F);
+        // NOTE: ReadOnlySpan<byte> cannot be an `out` parameter inside an async method
+        // (C# ref-struct restriction), so do the parse in a synchronous helper.
+        var (parsed, payloadBytes) = ParseFrame(buffer, n, KLineMode.Kwp2000);
+        parsed.Should().BeTrue();
+        payloadBytes.Should().Equal(0xC1, 0xEA, 0x8F);
+    }
+
+    // Sync helper to keep the ReadOnlySpan<byte> out param out of the async method.
+    private static (bool ok, byte[] payload) ParseFrame(byte[] buffer, int length, KLineMode mode)
+    {
+        bool ok = KLineFrameParser.TryParse(buffer.AsSpan(0, length), mode, out var payload);
+        return (ok, payload.ToArray());
     }
 
     // Helper builds an ECU→tester KWP response frame (target/source swapped vs request).
