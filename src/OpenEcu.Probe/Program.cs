@@ -45,14 +45,26 @@ async Task Capture(string label, int windowMs)
 Console.WriteLine($"== 5-baud init at 0x{address:X2} ==");
 await new KLineFiveBaudInitializer().InitializeAsync(new BreakLineAdapter(sp), address);
 
-// 2) Read the three handshake bytes (sync, KW1, KW2) as fast as they arrive.
-Console.WriteLine("-- reading handshake bytes (expect 55 08 08):");
+// 2) Read the handshake bytes. The break-toggle at the end of init produces a few
+//    line-settling noise bytes (e.g. 00) BEFORE the real sync arrives ~200 ms later, so
+//    skip everything until we see the 0x55 sync, then take the next two keyword bytes.
+Console.WriteLine("-- reading handshake bytes (skipping init noise, expect 55 08 08):");
 var hs = new List<int>();
 var hsClock = Stopwatch.StartNew();
-while (hs.Count < 3 && hsClock.ElapsedMilliseconds < 600)
+while (hsClock.ElapsedMilliseconds < 800)
 {
     int b = await ReadByte();
-    if (b >= 0) { hs.Add(b); Console.WriteLine($"     [{overall.ElapsedMilliseconds,6} ms] RX {b:X2}"); }
+    if (b < 0) continue;
+    Console.WriteLine($"     [{overall.ElapsedMilliseconds,6} ms] RX {b:X2}");
+    if (hs.Count == 0)
+    {
+        if (b == 0x55) hs.Add(b); // sync found; ignore any noise before it
+    }
+    else
+    {
+        hs.Add(b);
+        if (hs.Count >= 3) break; // 55, KW1, KW2
+    }
 }
 
 // 3) If we got a valid sync + keywords, complete the handshake within the W4 window.
