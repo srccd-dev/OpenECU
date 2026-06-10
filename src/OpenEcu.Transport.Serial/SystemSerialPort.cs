@@ -33,8 +33,24 @@ public sealed class SystemSerialPort : ISerialPort
     public Task WriteAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
         => _port.BaseStream.WriteAsync(data, ct).AsTask();
 
+    // NOTE: SerialPort's *async* read does not reliably honor cancellation or ReadTimeout on
+    // Windows and can hang when no data arrives. Use the synchronous read (which honors
+    // ReadTimeout) on a thread-pool thread, returning 0 on timeout instead of blocking forever.
     public Task<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
-        => _port.BaseStream.ReadAsync(buffer, ct).AsTask();
+        => Task.Run(() =>
+        {
+            var temp = new byte[buffer.Length];
+            try
+            {
+                int n = _port.Read(temp, 0, temp.Length);
+                temp.AsSpan(0, n).CopyTo(buffer.Span);
+                return n;
+            }
+            catch (TimeoutException)
+            {
+                return 0;
+            }
+        }, ct);
 
     public ValueTask DisposeAsync()
     {
