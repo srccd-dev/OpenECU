@@ -1,7 +1,8 @@
 # OpenECU Avalonia UI — Design Spec
 
 > Live-gauge desktop UI for OpenECU's read-only diagnostics, built on the existing
-> `OpenEcu.Core` + `OpenEcu.Transport.Serial`. Cross-platform Avalonia, dark theme.
+> `OpenEcu.Core` + `OpenEcu.Transport.Serial`. Cross-platform Avalonia; light/dark themes
+> (light is the default).
 
 - **Date:** 2026-06-10
 - **Status:** Approved (design); pending implementation plan
@@ -26,13 +27,18 @@ data-dense style of teslax.app / ecubooster.com.
 - A cross-platform Avalonia desktop app with a shared connection bar and three views:
   **Dashboard** (live gauges + tiles + fault strip), **Diagnostics** (full PID table + DTC
   panel), **Console** (raw protocol log).
-- Continuous live polling of supported PIDs; periodic DTC refresh.
-- Dark theme matching the ECU-monitor aesthetic.
+- **Constant** live polling of supported PIDs + periodic DTC refresh (~5 s) — essential
+  real-time feedback for tuning, treated as a core reliability requirement (see §8).
+- **Light and dark themes** (light is the default; dark for power users), with a
+  user-selectable accent color (white, teal, blue, green, yellow, red, black).
 
 **Non-goals (v1) — but explicitly *designed for* (see §7):**
 - Writing/flashing or any ECU modification (stays read-only; v2+).
 - **Heat-map / fuel-ignition map visualization** (needs reading map tables — v2/write
   territory). v1 only ensures the shell + data flow accommodate a future Maps view.
+- **Map difference reporting** (store the original map as a baseline; show the modified map
+  beside it with differences highlighted, side-by-side and easy to read) — v2; v1 keeps the
+  data model snapshot-friendly so baseline-vs-modified diffing slots in later (see §7).
 - **User-customizable dashboard layout** (choosing which readings go on which gauge/tile).
   v1 ships a fixed default layout but stores it as *data* so v2 adds editing + persistence.
 - Mode 04 clear-DTCs (UI button is present but disabled/stubbed in v1).
@@ -42,7 +48,9 @@ data-dense style of teslax.app / ecubooster.com.
 
 | Decision | Choice |
 |---|---|
-| Framework | Avalonia 11, .NET 8, Fluent **dark** theme |
+| Framework | Avalonia 11, .NET 8, Fluent theme |
+| Theme | **Light default** + dark option (user toggle) |
+| Accent color (v1) | User-selectable: white, teal, blue, green, yellow, red, black (theme-aware) |
 | MVVM | `CommunityToolkit.Mvvm` (MIT) |
 | Dashboard layout | **Hybrid** — hero radial gauges + tile grid (option C) |
 | Hero gauges (v1 default) | **RPM + Coolant** |
@@ -138,6 +146,12 @@ disabled in v1).
 **Console** — a scrolling, timestamped log of raw Tx/Rx hex frames and connection events,
 fed by `LoggingTransport` events. A "pause" toggle and "clear" button.
 
+**Settings** (a small control set in the connection bar or a settings flyout): a
+**light/dark theme toggle** (default light) and an **accent-color picker** (white, teal,
+blue, green, yellow, red, black — rendered theme-aware for contrast). These bind to app-level
+theme resources so all gauges/tiles/controls pick them up live. (Persistence to disk is a
+nice-to-have; see §13.)
+
 ## 7. Extensibility (v2-readiness) — first-class in v1
 
 These shape v1's structure so v2 features slot in without rework:
@@ -158,14 +172,30 @@ and will share the accent/color-ramp concept. **Not built in v1**; v1 only guara
 shell, navigation, and data flow accommodate it. (Heat-map *data* depends on reading ECU map
 tables — v2/write scope.)
 
+**Map difference reporting (v2).** A headline v2 capability: when a user edits a map, they
+should never guess what changed — OpenECU stores the **original map as a baseline** and shows
+the **modified map beside it with differences highlighted**, side-by-side and easy to read.
+v1 designs for this by keeping tabular/map data as **immutable snapshots** (a reading or a
+loaded map is a value snapshot, never a mutated buffer), so capturing a baseline and diffing
+two snapshots — and rendering the diff with the same color-ramp the `HeatMapControl` uses — is
+straightforward to add. Not built in v1.
+
 ## 8. Polling model
 
-On connect, `LiveDataService` reads supported PIDs once, then runs a background loop that
-round-robins `ReadPidAsync` over the supported set (a full cycle is ~1–2 s on K-line),
-updating each `MetricViewModel` as values return. DTCs refresh on a slower cadence (e.g.
-every ~5 s) and on demand. The loop is cancellable; Disconnect stops it and closes the port.
-Per-PID read failures are isolated (logged, that tile shows "—") so one bad read never stalls
-the loop.
+Constant, low-latency feedback is **essential during tuning**, so the polling loop is a core
+reliability requirement, not best-effort. On connect, `LiveDataService` reads supported PIDs
+once, then runs a continuous background loop:
+
+- **Weighted round-robin** — hero PIDs (RPM, coolant) are polled **every cycle**; the
+  remaining PIDs are interleaved across cycles, so the headline gauges stay snappy while
+  everything still refreshes (a full sweep is ~1–2 s on K-line).
+- **DTCs refresh every ~5 s** (firm requirement) and on demand.
+- **Per-PID failures are isolated** — logged, that tile shows "—", and the PID is retried on
+  the next cycle; one bad read never stalls the stream.
+- The loop is cancellable; Disconnect stops it and closes the port. A dropped connection is
+  detected (next-I/O error) and surfaced so the user can reconnect without restarting.
+- The service exposes a simple "last update" heartbeat so the UI can show that data is live
+  (and flag a stall immediately, which matters mid-tune).
 
 ## 9. Error handling
 
@@ -194,7 +224,8 @@ Bottom-up, each step runnable/testable:
 1. `LoggingTransport` (tested).
 2. `MetricDescriptor` catalog + `DashboardLayout` model + `MetricViewModel`.
 3. `LiveDataService` (tested via `FakeEcu`).
-4. App shell: project scaffold, dark theme, `MainWindow` + connection bar + view switcher.
+4. App shell: project scaffold, light/dark theme + accent picker, `MainWindow` + connection
+   bar + view switcher.
 5. `RadialGauge` control + Dashboard view (data-driven).
 6. Diagnostics view.
 7. Console view.
@@ -211,7 +242,9 @@ Bottom-up, each step runnable/testable:
 
 ## 13. Open questions (non-blocking)
 
-- Default DTC refresh cadence (start ~5 s; tune on hardware).
-- Whether to poll hero PIDs (RPM/coolant) more frequently than the round-robin (likely yes —
-  a weighted schedule; decide during implementation).
-- Theme accent color (default teal/blue; finalize during the RadialGauge step).
+- Exact weighting of hero vs. non-hero PID polling (start: heroes every cycle, others
+  interleaved one-per-cycle; tune on hardware).
+- Whether theme + accent settings persist to disk in v1 or reset per session (lean: persist
+  a small settings file).
+- Default accent (lean: teal) — the full picker (white/teal/blue/green/yellow/red/black) ships
+  in v1 regardless.
