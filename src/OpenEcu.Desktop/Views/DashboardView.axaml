@@ -15,7 +15,8 @@
             <Border Margin="8" Width="220" Height="150">
               <c:RadialGauge Value="{Binding Value, FallbackValue=0}"
                              Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
-                             ValueText="{Binding Display}" Label="{Binding Name}" />
+                             ValueText="{Binding Display}" Label="{Binding Name}"
+                             Accent="{DynamicResource AppAccentBrush}" />
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>

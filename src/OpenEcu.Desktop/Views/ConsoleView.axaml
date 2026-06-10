@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:OpenEcu.App.ViewModels;assembly=OpenEcu.App"
+             x:Class="OpenEcu.Desktop.Views.ConsoleView"
+             x:DataType="vm:ConsoleViewModel">
+  <DockPanel Margin="12">
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <ToggleButton Content="Pause" IsChecked="{Binding Paused}" />
+      <Button Content="Clear" Command="{Binding ClearCommand}" />
+    </StackPanel>
+    <Border CornerRadius="8" Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Lines}" Margin="8">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Text="{Binding}" FontFamily="Cascadia Code,Consolas,monospace" FontSize="12" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</UserControl>

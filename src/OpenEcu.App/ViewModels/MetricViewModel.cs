@@ -26,13 +26,23 @@ public sealed partial class MetricViewModel : ObservableObject
     private bool _isStale;
 
     [ObservableProperty]
+    private bool _isStatic;
+
+    [ObservableProperty]
     private byte[] _raw = Array.Empty<byte>();
 
     public string Display => Value is null ? "—" : $"{Value:0.##} {Unit}".Trim();
 
+    private int _unchanged;
+    private const int StaticThreshold = 5; // identical reads in a row before flagging static
+
     /// <summary>Apply a fresh reading from the ECU.</summary>
     public void Update(PidReading reading)
     {
+        bool same = Raw.AsSpan().SequenceEqual(reading.Raw); // compare to the previous reading before reassigning
+        _unchanged = same ? _unchanged + 1 : 0;
+        IsStatic = _unchanged >= StaticThreshold;
+
         Raw = reading.Raw;
         Value = reading.Value;
         IsStale = reading.Value is null;
