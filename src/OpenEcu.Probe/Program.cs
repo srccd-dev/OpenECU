@@ -106,14 +106,23 @@ else
     return;
 }
 
-// 4) Inter-byte timing sweep: send TesterPresent (the simplest request) at several
-//    inter-byte gaps and see which one the ECU answers (expect a 7E somewhere).
-byte[] testerPresent = KLineFrameBuilder.BuildRequest(new byte[] { 0x3E }, KLineMode.Iso9141);
-foreach (int gap in new[] { 0, 5, 10, 15, 20, 30 })
+// 4) The ECU answered keyword 0x08, so (per the original: Init = KW2 ^ 0xFF = 0xF7 = 247)
+//    it expects the STANDARD OBD-II header 68 6A F1, not the Triumph D5 F5. Build OBD
+//    frames with that header and try real reads (sweeping a couple of inter-byte gaps).
+foreach (int gap in new[] { 0, 5, 15 })
 {
-    Console.WriteLine($"\n== TesterPresent @ {gap} ms inter-byte: TX {Hex(testerPresent)} ==");
-    bool sent = await SendPaced(testerPresent, gap);
-    if (sent) await Capture("   RX (ECU response — want 7E):", 600);
+    foreach (var (name, payload) in new (string, byte[])[]
+    {
+        ("Mode 01 PID 00 (supported PIDs)", new byte[] { 0x01, 0x00 }),
+        ("Mode 01 PID 0C (RPM)",            new byte[] { 0x01, 0x0C }),
+        ("Mode 03 (stored DTCs)",           new byte[] { 0x03 }),
+    })
+    {
+        byte[] frame = BuildObd(payload);
+        Console.WriteLine($"\n== {name} (OBD hdr) @ {gap} ms: TX {Hex(frame)} ==");
+        bool sent = await SendPaced(frame, gap);
+        if (sent) await Capture("   RX (want 41../43..):", 700);
+    }
 }
 
 Console.WriteLine("\nDone. Copy ALL output above and send it back.");
@@ -123,6 +132,20 @@ static string Hex(ReadOnlySpan<byte> data)
     var sb = new System.Text.StringBuilder();
     foreach (byte b in data) sb.Append(b.ToString("X2")).Append(' ');
     return sb.ToString().TrimEnd();
+}
+
+// Builds a standard OBD-II ISO9141-2 request frame: 68 6A F1 <payload> <checksum>.
+static byte[] BuildObd(byte[] payload)
+{
+    var frame = new byte[3 + payload.Length + 1];
+    frame[0] = 0x68; // format (functional OBD-II)
+    frame[1] = 0x6A; // target = ECU
+    frame[2] = 0xF1; // source = tester
+    payload.CopyTo(frame, 3);
+    int sum = 0;
+    for (int i = 0; i < frame.Length - 1; i++) sum += frame[i];
+    frame[^1] = (byte)sum;
+    return frame;
 }
 
 // Precise short delay (Task.Delay has ~15 ms granularity, too coarse for P4 timing).
