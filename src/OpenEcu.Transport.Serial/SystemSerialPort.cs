@@ -28,6 +28,8 @@ public sealed class SystemSerialPort : ISerialPort
             _port.Close();
     }
 
+    public void SetBreak(bool on) => _port.BreakState = on;
+
     public Task WriteAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
         => _port.BaseStream.WriteAsync(data, ct).AsTask();
 

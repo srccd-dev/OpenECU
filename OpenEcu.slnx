@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/OpenEcu.Core/OpenEcu.Core.csproj" />
+    <Project Path="src/OpenEcu.Probe/OpenEcu.Probe.csproj" />
     <Project Path="src/OpenEcu.Transport.Serial/OpenEcu.Transport.Serial.csproj" />
   </Folder>
   <Folder Name="/tests/">
