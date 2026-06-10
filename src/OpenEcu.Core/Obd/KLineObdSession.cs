@@ -39,7 +39,31 @@ public sealed class KLineObdSession : IAsyncDisposable
         return response;
     }
 
-    public Task ConnectAsync(CancellationToken ct = default) => throw new NotImplementedException();
+    public async Task ConnectAsync(CancellationToken ct = default)
+    {
+        await _initializer.InitializeAsync(_breakLine, _initAddress, ct);
+
+        // After init the ECU sends some line-settling noise, then 0x55 sync + 2 keyword bytes.
+        int sync = await ReadUntilAsync(0x55, ct);
+        if (sync < 0)
+            throw new EcuConnectionException("No 0x55 sync byte after 5-baud init.");
+
+        int kw1 = await ReadByteAsync(ct);
+        int kw2 = await ReadByteAsync(ct);
+        if (kw1 < 0 || kw2 < 0)
+            throw new EcuConnectionException("Missing keyword bytes after sync.");
+
+        await _delay(TimeSpan.FromMilliseconds(30)); // W4
+        byte invKw2 = (byte)(kw2 ^ 0xFF);
+        await _transport.WriteAsync(new[] { invKw2 }, ct);
+
+        // Skip the echo of our ~KW2; the next distinct byte is the inverted address (~addr).
+        int invAddr = await ReadSkippingAsync(invKw2, ct);
+        if (invAddr < 0)
+            throw new EcuConnectionException("No inverted-address reply; handshake not accepted.");
+
+        IsConnected = true;
+    }
     public Task<IReadOnlyList<byte>> ReadSupportedPidsAsync(CancellationToken ct = default) => throw new NotImplementedException();
     public Task<PidReading> ReadPidAsync(byte pid, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<IReadOnlyList<string>> ReadDtcsAsync(CancellationToken ct = default) => throw new NotImplementedException();
@@ -76,5 +100,27 @@ public sealed class KLineObdSession : IAsyncDisposable
         var buffer = new byte[1];
         int n = await _transport.ReadAsync(buffer, ct);
         return n > 0 ? buffer[0] : -1;
+    }
+
+    // Reads (discarding) until the target byte appears; -1 if the stream goes idle first.
+    private async Task<int> ReadUntilAsync(byte target, CancellationToken ct)
+    {
+        while (true)
+        {
+            int b = await ReadByteAsync(ct);
+            if (b < 0) return -1;
+            if (b == target) return b;
+        }
+    }
+
+    // Reads until a byte that is NOT skip; -1 if the stream goes idle first.
+    private async Task<int> ReadSkippingAsync(byte skip, CancellationToken ct)
+    {
+        while (true)
+        {
+            int b = await ReadByteAsync(ct);
+            if (b < 0) return -1;
+            if (b != skip) return b;
+        }
     }
 }
