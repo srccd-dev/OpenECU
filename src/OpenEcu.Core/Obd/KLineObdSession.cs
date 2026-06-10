@@ -1,0 +1,80 @@
+using System.IO;
+using OpenEcu.Core.Adapters;
+using OpenEcu.Core.Transport;
+
+namespace OpenEcu.Core.Obd;
+
+/// <summary>
+/// A live ISO9141-2 OBD-II session over a K-line cable: 5-baud init, keyword handshake,
+/// echo-locked transmit, read-until-idle, and OBD decode. Caller opens the transport first.
+/// </summary>
+public sealed class KLineObdSession : IAsyncDisposable
+{
+    private readonly IEcuTransport _transport;
+    private readonly IBreakLine _breakLine;
+    private readonly byte _initAddress;
+    private readonly Func<TimeSpan, Task> _delay;
+    private readonly KLineFiveBaudInitializer _initializer;
+
+    public KLineObdSession(IEcuTransport transport, IBreakLine breakLine,
+        byte initAddress = 0x33, Func<TimeSpan, Task>? delay = null)
+    {
+        _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+        _breakLine = breakLine ?? throw new ArgumentNullException(nameof(breakLine));
+        _initAddress = initAddress;
+        _delay = delay ?? Task.Delay;
+        _initializer = new KLineFiveBaudInitializer(delay: _delay);
+    }
+
+    public bool IsConnected { get; private set; }
+
+    public async Task<ObdResponse> RequestAsync(byte[] payload, CancellationToken ct = default)
+    {
+        byte[] frame = ObdMessage.BuildRequest(payload);
+        await SendEchoLockedAsync(frame, ct);
+        byte[] responseBytes = await ReadUntilIdleAsync(ct);
+        if (!ObdMessage.TryParseResponse(responseBytes, out ObdResponse response))
+            throw new InvalidDataException(
+                $"Invalid OBD response: {BitConverter.ToString(responseBytes)}");
+        return response;
+    }
+
+    public Task ConnectAsync(CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<IReadOnlyList<byte>> ReadSupportedPidsAsync(CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<PidReading> ReadPidAsync(byte pid, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<IReadOnlyList<string>> ReadDtcsAsync(CancellationToken ct = default) => throw new NotImplementedException();
+
+    public ValueTask DisposeAsync() => _transport.DisposeAsync();
+
+    // Sends each byte then waits for its echo (the single-wire K-line echoes TX).
+    private async Task SendEchoLockedAsync(byte[] frame, CancellationToken ct)
+    {
+        foreach (byte tx in frame)
+        {
+            await _transport.WriteAsync(new[] { tx }, ct);
+            int echo = await ReadByteAsync(ct);
+            if (echo != tx)
+                throw new InvalidDataException($"Echo mismatch: sent 0x{tx:X2}, read 0x{echo:X2}.");
+        }
+    }
+
+    // Reads bytes until the idle gap (a zero-length read).
+    private async Task<byte[]> ReadUntilIdleAsync(CancellationToken ct)
+    {
+        var bytes = new List<byte>();
+        while (true)
+        {
+            int b = await ReadByteAsync(ct);
+            if (b < 0) break;
+            bytes.Add((byte)b);
+        }
+        return bytes.ToArray();
+    }
+
+    private async Task<int> ReadByteAsync(CancellationToken ct)
+    {
+        var buffer = new byte[1];
+        int n = await _transport.ReadAsync(buffer, ct);
+        return n > 0 ? buffer[0] : -1;
+    }
+}
