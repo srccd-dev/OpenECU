@@ -538,9 +538,15 @@ public sealed class KLineProtocol : IEcuAdapter
         await _transport.WriteAsync(request, ct);
 
         byte[] responseFrame = await KLineFrameReader.ReadFrameAsync(_transport, _mode, ct);
+        return ParseResponse(responseFrame);
+    }
+
+    // NOTE: TryParse has a ReadOnlySpan<byte> out param, which cannot live in an async
+    // method under C# 12 (net8.0 default). Keep it in a synchronous helper.
+    private EcuResponse ParseResponse(byte[] responseFrame)
+    {
         if (!KLineFrameParser.TryParse(responseFrame, _mode, out var responsePayload))
             throw new InvalidDataException("ECU response failed checksum validation.");
-
         return EcuResponse.FromPayload(responsePayload);
     }
 
