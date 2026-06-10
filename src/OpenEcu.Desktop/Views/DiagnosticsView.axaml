@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:OpenEcu.App.ViewModels;assembly=OpenEcu.App"
+             x:Class="OpenEcu.Desktop.Views.DiagnosticsView"
+             x:DataType="vm:DiagnosticsViewModel">
+  <DockPanel Margin="12">
+    <Border DockPanel.Dock="Bottom" Margin="0,12,0,0" Padding="10" CornerRadius="8"
+            Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+      <StackPanel>
+        <TextBlock Text="Fault codes" FontSize="13" Opacity="0.7" />
+        <ItemsControl ItemsSource="{Binding Dtcs}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" /></DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="(no stored codes)" Opacity="0.5" IsVisible="{Binding !Dtcs.Count}" />
+        <Button Content="Clear codes" IsEnabled="{Binding CanClearCodes}" Margin="0,8,0,0" />
+      </StackPanel>
+    </Border>
+
+    <DataGrid ItemsSource="{Binding Metrics}" IsReadOnly="True" GridLinesVisibility="Horizontal"
+              CanUserReorderColumns="False" CanUserResizeColumns="True">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Sensor" Binding="{Binding Name}" Width="2*" />
+        <DataGridTextColumn Header="Value" Binding="{Binding Display}" Width="*" />
+        <DataGridTemplateColumn Header="" Width="80">
+          <DataGridTemplateColumn.CellTemplate>
+            <DataTemplate x:DataType="vm:MetricViewModel">
+              <TextBlock Text="static" FontSize="11" Opacity="0.6" VerticalAlignment="Center"
+                         IsVisible="{Binding IsStatic}" />
+            </DataTemplate>
+          </DataGridTemplateColumn.CellTemplate>
+        </DataGridTemplateColumn>
+      </DataGrid.Columns>
+    </DataGrid>
+  </DockPanel>
+</UserControl>
