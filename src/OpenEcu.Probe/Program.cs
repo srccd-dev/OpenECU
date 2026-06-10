@@ -44,7 +44,7 @@ async Task Capture(string label, int windowMs)
 // Sends a frame the way the original does: one byte at a time, waiting for each byte's
 // echo before sending the next. On the single-wire K-line that echo round-trip provides
 // the inter-byte gap (P4) the ECU needs. Returns false if an echo never came back.
-async Task<bool> SendPaced(byte[] frame)
+async Task<bool> SendPaced(byte[] frame, int interByteMs)
 {
     foreach (byte tx in frame)
     {
@@ -58,6 +58,7 @@ async Task<bool> SendPaced(byte[] frame)
             if (e >= 0) Console.WriteLine($"     (unexpected {e:X2} while pacing {tx:X2})");
         }
         if (!echoed) { Console.WriteLine($"     (no echo for {tx:X2} — aborting frame)"); return false; }
+        BusyWaitMs(interByteMs); // explicit inter-byte gap (P4), independent of latency timer
     }
     return true;
 }
@@ -105,23 +106,14 @@ else
     return;
 }
 
-// 4) Now that the frame is paced (echo-locked), the echo is consumed during SendPaced,
-//    so the capture below shows ONLY the ECU's actual response.
-var probes = new (string Name, byte[] Payload)[]
+// 4) Inter-byte timing sweep: send TesterPresent (the simplest request) at several
+//    inter-byte gaps and see which one the ECU answers (expect a 7E somewhere).
+byte[] testerPresent = KLineFrameBuilder.BuildRequest(new byte[] { 0x3E }, KLineMode.Iso9141);
+foreach (int gap in new[] { 0, 5, 10, 15, 20, 30 })
 {
-    ("TesterPresent (3E)",                      new byte[] { 0x3E }),
-    ("Mode 01 PID 00 (supported PIDs)",         new byte[] { 0x01, 0x00 }),
-    ("Mode 03 (stored DTCs)",                   new byte[] { 0x03 }),
-    ("SecurityAccess request seed (27 03 02)",  new byte[] { 0x27, 0x03, 0x02 }),
-    ("Triumph ID (21 80)",                      new byte[] { 0x21, 0x80 }),
-};
-
-foreach (var (name, payload) in probes)
-{
-    byte[] frame = KLineFrameBuilder.BuildRequest(payload, KLineMode.Iso9141);
-    Console.WriteLine($"\n== {name}: TX {Hex(frame)} (echo-locked) ==");
-    bool sent = await SendPaced(frame);
-    if (sent) await Capture("   RX (ECU response):", 800);
+    Console.WriteLine($"\n== TesterPresent @ {gap} ms inter-byte: TX {Hex(testerPresent)} ==");
+    bool sent = await SendPaced(testerPresent, gap);
+    if (sent) await Capture("   RX (ECU response — want 7E):", 600);
 }
 
 Console.WriteLine("\nDone. Copy ALL output above and send it back.");
@@ -131,6 +123,14 @@ static string Hex(ReadOnlySpan<byte> data)
     var sb = new System.Text.StringBuilder();
     foreach (byte b in data) sb.Append(b.ToString("X2")).Append(' ');
     return sb.ToString().TrimEnd();
+}
+
+// Precise short delay (Task.Delay has ~15 ms granularity, too coarse for P4 timing).
+static void BusyWaitMs(int ms)
+{
+    if (ms <= 0) return;
+    var sw = Stopwatch.StartNew();
+    while (sw.Elapsed.TotalMilliseconds < ms) { }
 }
 
 // Adapts a serial port's SetBreak to the Core IBreakLine abstraction.
