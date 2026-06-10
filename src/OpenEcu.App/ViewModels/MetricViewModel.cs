@@ -39,7 +39,7 @@ public sealed partial class MetricViewModel : ObservableObject
     /// <summary>Apply a fresh reading from the ECU.</summary>
     public void Update(PidReading reading)
     {
-        bool same = _raw.AsSpan().SequenceEqual(reading.Raw);
+        bool same = Raw.AsSpan().SequenceEqual(reading.Raw); // compare to the previous reading before reassigning
         _unchanged = same ? _unchanged + 1 : 0;
         IsStatic = _unchanged >= StaticThreshold;
 
