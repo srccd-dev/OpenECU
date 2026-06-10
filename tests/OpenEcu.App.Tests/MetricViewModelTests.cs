@@ -42,4 +42,28 @@ public class MetricViewModelTests
         vm.IsStale.Should().BeTrue();
         vm.Display.Should().Be("—");
     }
+
+    [Fact]
+    public void Repeated_identical_readings_flag_static()
+    {
+        var vm = ForRpm();
+        var reading = new OpenEcu.Core.Obd.PidReading(0x0C, "Engine RPM", 1000, "rpm", new byte[] { 0x0F, 0xA0 });
+
+        for (int i = 0; i < 8; i++) vm.Update(reading);
+
+        vm.IsStatic.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_changed_reading_clears_static()
+    {
+        var vm = ForRpm();
+        var a = new OpenEcu.Core.Obd.PidReading(0x0C, "Engine RPM", 1000, "rpm", new byte[] { 0x0F, 0xA0 });
+        for (int i = 0; i < 8; i++) vm.Update(a);
+        vm.IsStatic.Should().BeTrue();
+
+        vm.Update(new OpenEcu.Core.Obd.PidReading(0x0C, "Engine RPM", 1200, "rpm", new byte[] { 0x12, 0xC0 }));
+
+        vm.IsStatic.Should().BeFalse();
+    }
 }
