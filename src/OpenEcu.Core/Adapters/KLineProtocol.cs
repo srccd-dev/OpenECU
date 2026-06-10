@@ -37,9 +37,34 @@ public sealed class KLineProtocol : IEcuAdapter
         return EcuResponse.FromPayload(responsePayload);
     }
 
-    public Task ConnectAsync(CancellationToken ct = default) => throw new NotImplementedException();
-    public Task DisconnectAsync(CancellationToken ct = default) => throw new NotImplementedException();
-    public Task TesterPresentAsync(CancellationToken ct = default) => throw new NotImplementedException();
+    public async Task ConnectAsync(CancellationToken ct = default)
+    {
+        EcuResponse response = await RequestAsync(new byte[] { KwpServiceId.StartCommunication }, ct);
+        if (!response.IsPositive ||
+            response.ServiceId != KwpServiceId.PositiveResponseFor(KwpServiceId.StartCommunication))
+        {
+            throw new EcuConnectionException(
+                $"StartCommunication failed (positive={response.IsPositive}, sid=0x{response.ServiceId:X2}).");
+        }
+        IsConnected = true;
+    }
+
+    public async Task DisconnectAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await RequestAsync(new byte[] { KwpServiceId.StopCommunication }, ct);
+        }
+        finally
+        {
+            IsConnected = false;
+        }
+    }
+
+    public async Task TesterPresentAsync(CancellationToken ct = default)
+    {
+        await RequestAsync(new byte[] { KwpServiceId.TesterPresent }, ct);
+    }
 
     public ValueTask DisposeAsync() => _transport.DisposeAsync();
 }
