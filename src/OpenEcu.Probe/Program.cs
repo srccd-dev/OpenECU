@@ -1,65 +1,103 @@
 using System.Diagnostics;
 using OpenEcu.Core.Adapters;
+using OpenEcu.Core.Protocol;
 using OpenEcu.Transport.Serial;
 
-// Usage: dotnet run --project src/OpenEcu.Probe -- [COMx] [addrHex,addrHex,...]
-// Defaults: COM8, addresses 33,D5
-string port = args.Length > 0 ? args[0] : "COM8";
-byte[] addresses = (args.Length > 1 ? args[1] : "33,D5")
-    .Split(',', StringSplitOptions.RemoveEmptyEntries)
-    .Select(s => Convert.ToByte(s.Trim(), 16))
-    .ToArray();
+// Usage: dotnet run --project src/OpenEcu.Probe -- [COMx] [addrHex]
+// Defaults: COM8, address 33
+string portName = args.Length > 0 ? args[0] : "COM8";
+byte address = Convert.ToByte(args.Length > 1 ? args[1] : "33", 16);
 
-Console.WriteLine($"OpenECU probe — port={port}, addresses={string.Join(",", addresses.Select(a => $"0x{a:X2}"))}");
-Console.WriteLine("Make sure the bike is powered (ignition on / battery tender) and the cable is connected.\n");
+Console.WriteLine($"OpenECU probe — port={portName}, init address=0x{address:X2}");
+Console.WriteLine("Bike must be powered (ignition on / battery tender), cable connected.\n");
 
-foreach (byte address in addresses)
+await using var sp = new SystemSerialPort(portName, baudRate: 10400, readTimeoutMs: 200, writeTimeoutMs: 1000);
+try { sp.Open(); }
+catch (Exception ex) { Console.WriteLine($"Could not open {portName}: {ex.GetType().Name}: {ex.Message}"); return; }
+
+var overall = Stopwatch.StartNew();
+
+// Reads a single byte with a short timeout; returns -1 if none arrived.
+async Task<int> ReadByte()
 {
-    Console.WriteLine($"=== 5-baud init at address 0x{address:X2} ===");
-    await using var sp = new SystemSerialPort(port, baudRate: 10400, readTimeoutMs: 300, writeTimeoutMs: 1000);
-    try
-    {
-        sp.Open();
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"  Could not open {port}: {ex.GetType().Name}: {ex.Message}");
-        return;
-    }
-
-    // Drive the 5-baud init on the break line.
-    var initializer = new KLineFiveBaudInitializer();
-    IBreakLine line = new BreakLineAdapter(sp);
-    var sw = Stopwatch.StartNew();
-    await initializer.InitializeAsync(line, address);
-    Console.WriteLine($"  init sent in {sw.ElapsedMilliseconds} ms; listening 3s for the ECU...");
-
-    // Capture whatever comes back for ~3 seconds.
-    sw.Restart();
-    var buffer = new byte[64];
-    int total = 0;
-    while (sw.ElapsedMilliseconds < 3000)
-    {
-        int n;
-        using var readCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(400));
-        try { n = await sp.ReadAsync(buffer, readCts.Token); }
-        catch (OperationCanceledException) { n = 0; }
-        catch (TimeoutException) { n = 0; }
-        if (n > 0)
-        {
-            total += n;
-            string hex = string.Join(" ", buffer.Take(n).Select(b => b.ToString("X2")));
-            Console.WriteLine($"  [{sw.ElapsedMilliseconds,5} ms] RX {n,2}: {hex}");
-        }
-    }
-    Console.WriteLine(total == 0
-        ? "  (no bytes received)\n"
-        : $"  total {total} bytes received\n");
-
-    sp.Close();
+    using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(120));
+    var b = new byte[1];
+    try { int n = await sp.ReadAsync(b, cts.Token); return n > 0 ? b[0] : -1; }
+    catch (OperationCanceledException) { return -1; }
+    catch (TimeoutException) { return -1; }
 }
 
-Console.WriteLine("Done. Copy ALL output above and send it back for analysis.");
+// Raw-captures and logs bytes for a time window.
+async Task Capture(string label, int windowMs)
+{
+    Console.WriteLine(label);
+    var sw = Stopwatch.StartNew();
+    int total = 0;
+    while (sw.ElapsedMilliseconds < windowMs)
+    {
+        int b = await ReadByte();
+        if (b >= 0) { total++; Console.WriteLine($"     [{overall.ElapsedMilliseconds,6} ms] RX {b:X2}"); }
+    }
+    if (total == 0) Console.WriteLine("     (nothing)");
+}
+
+// 1) 5-baud init on the break line.
+Console.WriteLine($"== 5-baud init at 0x{address:X2} ==");
+await new KLineFiveBaudInitializer().InitializeAsync(new BreakLineAdapter(sp), address);
+
+// 2) Read the three handshake bytes (sync, KW1, KW2) as fast as they arrive.
+Console.WriteLine("-- reading handshake bytes (expect 55 08 08):");
+var hs = new List<int>();
+var hsClock = Stopwatch.StartNew();
+while (hs.Count < 3 && hsClock.ElapsedMilliseconds < 600)
+{
+    int b = await ReadByte();
+    if (b >= 0) { hs.Add(b); Console.WriteLine($"     [{overall.ElapsedMilliseconds,6} ms] RX {b:X2}"); }
+}
+
+// 3) If we got a valid sync + keywords, complete the handshake within the W4 window.
+if (hs.Count >= 3 && hs[0] == 0x55)
+{
+    byte kw2 = (byte)hs[2];
+    byte invKw2 = (byte)(kw2 ^ 0xFF);
+    await Task.Delay(30); // W4 (25-50 ms)
+    Console.WriteLine($"-- TX ~KW2 = {invKw2:X2}");
+    await sp.WriteAsync(new byte[] { invKw2 });
+    // Raw-log whatever follows: a possible echo of invKw2, then the inverted address (~0x33 = CC).
+    await Capture("   (expect [echo?] then invAddr CC):", 400);
+}
+else
+{
+    Console.WriteLine($"-- did not get a clean 55 + keywords (got: {string.Join(" ", hs.Select(x => x.ToString("X2")))}). Stopping.");
+    return;
+}
+
+// 4) Fire standard OBD-II reads and raw-log the replies (no parsing yet).
+var probes = new (string Name, byte[] Payload)[]
+{
+    ("Mode 01 PID 00 (supported PIDs)", new byte[] { 0x01, 0x00 }),
+    ("Mode 01 PID 0C (RPM)",            new byte[] { 0x01, 0x0C }),
+    ("Mode 01 PID 05 (coolant temp)",  new byte[] { 0x01, 0x05 }),
+    ("Mode 03 (stored DTCs)",          new byte[] { 0x03 }),
+    ("Triumph ID (21 80)",             new byte[] { 0x21, 0x80 }),
+};
+
+foreach (var (name, payload) in probes)
+{
+    byte[] frame = KLineFrameBuilder.BuildRequest(payload, KLineMode.Iso9141);
+    Console.WriteLine($"\n== {name}: TX {Hex(frame)} ==");
+    await sp.WriteAsync(frame);
+    await Capture("   RX (may include a TX echo first):", 800);
+}
+
+Console.WriteLine("\nDone. Copy ALL output above and send it back.");
+
+static string Hex(ReadOnlySpan<byte> data)
+{
+    var sb = new System.Text.StringBuilder();
+    foreach (byte b in data) sb.Append(b.ToString("X2")).Append(' ');
+    return sb.ToString().TrimEnd();
+}
 
 // Adapts a serial port's SetBreak to the Core IBreakLine abstraction.
 file sealed class BreakLineAdapter(ISerialPort port) : IBreakLine
