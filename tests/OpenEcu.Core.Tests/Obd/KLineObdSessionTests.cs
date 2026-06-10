@@ -51,4 +51,52 @@ public class KLineObdSessionTests
 
         await act.Should().ThrowAsync<EcuConnectionException>();
     }
+
+    [Fact]
+    public async Task ReadPidAsync_decodes_a_value()
+    {
+        var ecu = new FakeEcu(new()
+        {
+            ["0105"] = new byte[] { 0x48, 0x6B, 0xD1, 0x41, 0x05, 0x44, 0x0E }, // coolant 0x44 -> 28 C; checksum 0x48+0x6B+0xD1+0x41+0x05+0x44=0x20E→0x0E
+        }, connected: true);
+        await ecu.OpenAsync();
+        var session = new KLineObdSession(ecu, ecu, delay: NoDelay);
+
+        PidReading r = await session.ReadPidAsync(0x05);
+
+        r.Value.Should().Be(28);
+        r.Unit.Should().Be("C");
+    }
+
+    [Fact]
+    public async Task ReadSupportedPidsAsync_walks_the_bitmask_chain()
+    {
+        var ecu = new FakeEcu(new()
+        {
+            ["0100"] = new byte[] { 0x48, 0x6B, 0xD1, 0x41, 0x00, 0xBE, 0x1E, 0x90, 0x11, 0x42 },
+            ["0120"] = new byte[] { 0x48, 0x6B, 0xD1, 0x41, 0x20, 0x00, 0x00, 0x00, 0x01, 0xE6 },
+            ["0140"] = new byte[] { 0x48, 0x6B, 0xD1, 0x41, 0x40, 0x00, 0x00, 0x00, 0x00, 0x05 },
+        }, connected: true);
+        await ecu.OpenAsync();
+        var session = new KLineObdSession(ecu, ecu, delay: NoDelay);
+
+        var pids = await session.ReadSupportedPidsAsync();
+
+        pids.Should().Equal(0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x0D, 0x0E, 0x0F, 0x11, 0x14, 0x1C, 0x20, 0x40);
+    }
+
+    [Fact]
+    public async Task ReadDtcsAsync_returns_stored_codes()
+    {
+        var ecu = new FakeEcu(new()
+        {
+            ["03"] = new byte[] { 0x48, 0x6B, 0xD1, 0x43, 0x15, 0x02, 0x00, 0x00, 0x00, 0x00, 0xDE },
+        }, connected: true);
+        await ecu.OpenAsync();
+        var session = new KLineObdSession(ecu, ecu, delay: NoDelay);
+
+        var dtcs = await session.ReadDtcsAsync();
+
+        dtcs.Should().Equal("P1502");
+    }
 }

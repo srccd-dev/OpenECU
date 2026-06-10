@@ -64,9 +64,40 @@ public sealed class KLineObdSession : IAsyncDisposable
 
         IsConnected = true;
     }
-    public Task<IReadOnlyList<byte>> ReadSupportedPidsAsync(CancellationToken ct = default) => throw new NotImplementedException();
-    public Task<PidReading> ReadPidAsync(byte pid, CancellationToken ct = default) => throw new NotImplementedException();
-    public Task<IReadOnlyList<string>> ReadDtcsAsync(CancellationToken ct = default) => throw new NotImplementedException();
+    public async Task<IReadOnlyList<byte>> ReadSupportedPidsAsync(CancellationToken ct = default)
+    {
+        var all = new List<byte>();
+        foreach (byte basePid in new byte[] { 0x00, 0x20, 0x40 })
+        {
+            ObdResponse resp = await RequestAsync(new byte[] { 0x01, basePid }, ct);
+            // Payload = [echoed pid, 4 bitmask bytes]
+            if (resp.ServiceId != 0x41 || resp.Payload.Length < 5 || resp.Payload[0] != basePid)
+                break;
+            IReadOnlyList<byte> pids = SupportedPids.Parse(basePid, resp.Payload.AsSpan(1, 4));
+            all.AddRange(pids);
+            if (!pids.Contains((byte)(basePid + 0x20)))
+                break; // next 32-PID range not advertised
+        }
+        return all;
+    }
+
+    public async Task<PidReading> ReadPidAsync(byte pid, CancellationToken ct = default)
+    {
+        ObdResponse resp = await RequestAsync(new byte[] { 0x01, pid }, ct);
+        if (resp.ServiceId != 0x41 || resp.Payload.Length < 1 || resp.Payload[0] != pid)
+            throw new InvalidDataException($"Unexpected response to PID 0x{pid:X2}.");
+        // Extract to a local array first: ReadOnlySpan<byte> is a ref struct, can't live across await.
+        byte[] pidData = resp.Payload[1..];
+        return PidDecoder.Decode(pid, pidData);
+    }
+
+    public async Task<IReadOnlyList<string>> ReadDtcsAsync(CancellationToken ct = default)
+    {
+        ObdResponse resp = await RequestAsync(new byte[] { 0x03 }, ct);
+        if (resp.ServiceId != 0x43)
+            throw new InvalidDataException("Unexpected Mode 03 response.");
+        return DtcDecoder.Decode(resp.Payload);
+    }
 
     public ValueTask DisposeAsync() => _transport.DisposeAsync();
 
