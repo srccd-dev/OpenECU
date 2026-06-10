@@ -84,14 +84,13 @@ else
     return;
 }
 
-// 4) Fire standard OBD-II reads and raw-log the replies (no parsing yet).
+// 4) Probe the gate. The original sends SecurityAccess (0x27) FIRST, before any data
+//    request, so try that first and capture whether the ECU returns a seed (67 03 02 ...).
 var probes = new (string Name, byte[] Payload)[]
 {
-    ("Mode 01 PID 00 (supported PIDs)", new byte[] { 0x01, 0x00 }),
-    ("Mode 01 PID 0C (RPM)",            new byte[] { 0x01, 0x0C }),
-    ("Mode 01 PID 05 (coolant temp)",  new byte[] { 0x01, 0x05 }),
-    ("Mode 03 (stored DTCs)",          new byte[] { 0x03 }),
-    ("Triumph ID (21 80)",             new byte[] { 0x21, 0x80 }),
+    ("SecurityAccess request seed (27 03 02)", new byte[] { 0x27, 0x03, 0x02 }),
+    ("TesterPresent (3E)",                     new byte[] { 0x3E }),
+    ("Mode 01 PID 00 (control)",               new byte[] { 0x01, 0x00 }),
 };
 
 foreach (var (name, payload) in probes)
