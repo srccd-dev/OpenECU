@@ -1,6 +1,6 @@
 using System.IO;
 using System.Linq;
-using FluentAssertions;
+using AwesomeAssertions;
 using OpenEcu.Core.Adapters;
 using OpenEcu.Core.Protocol;
 using OpenEcu.Core.Transport;

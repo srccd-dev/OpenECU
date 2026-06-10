@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using OpenEcu.Core.Transport;
 using OpenEcu.Transport.Serial;
 using Xunit;
@@ -11,7 +11,7 @@ public class ManualHardwareTests
     // SerialPortEnumerator.GetPortNames(). On the author's machine it is COM8.
     private const string PortName = "COM8";
 
-    [Fact(Skip = "Manual: requires the FTDI KKL cable plugged in. Set PortName, then remove Skip and run.")]
+    [Fact(Skip = "Manual: requires the FTDI KKL cable plugged in. Change to [Fact] (keep the attribute, drop Skip), set PortName, then run.")]
     public async Task Can_open_write_and_close_the_real_cable()
     {
         await using var port = new SystemSerialPort(PortName, baudRate: 10400, readTimeoutMs: 1000, writeTimeoutMs: 1000);

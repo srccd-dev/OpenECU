@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using OpenEcu.Transport.Serial;
 using Xunit;
 
