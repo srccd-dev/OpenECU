@@ -1,9 +1,10 @@
+using OpenEcu.Core.Adapters;
 using OpenEcu.Core.Transport;
 
 namespace OpenEcu.Transport.Serial;
 
 /// <summary>An IEcuTransport backed by a serial (Virtual COM Port) device.</summary>
-public sealed class SerialPortTransport : IEcuTransport
+public sealed class SerialPortTransport : IEcuTransport, IBreakLine
 {
     private readonly ISerialPort _port;
 
@@ -37,6 +38,8 @@ public sealed class SerialPortTransport : IEcuTransport
         EnsureOpen();
         return await _port.ReadAsync(buffer, ct);
     }
+
+    public void SetBreak(bool on) => _port.SetBreak(on);
 
     public ValueTask DisposeAsync() => _port.DisposeAsync();
 

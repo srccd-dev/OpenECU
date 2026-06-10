@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using OpenEcu.Core.Adapters;
 using OpenEcu.Core.Transport;
 using OpenEcu.Transport.Serial;
 using Xunit;
@@ -54,5 +55,17 @@ public class SerialPortTransportTests
 
         var act = async () => await transport.WriteAsync(new byte[] { 0x01 });
         await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void SetBreak_delegates_to_the_port_and_is_an_IBreakLine()
+    {
+        var fake = new FakeSerialPort();
+        var transport = new SerialPortTransport(fake);
+
+        ((IBreakLine)transport).SetBreak(true);
+        ((IBreakLine)transport).SetBreak(false);
+
+        fake.BreakToggles.Should().Equal(true, false);
     }
 }
