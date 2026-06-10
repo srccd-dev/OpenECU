@@ -63,6 +63,28 @@ async Task<bool> SendPaced(byte[] frame, int interByteMs)
     return true;
 }
 
+// Reads a full response: collects bytes until a short idle gap (or the window expires).
+async Task<int[]> ReadResponse(int windowMs)
+{
+    var bytes = new List<int>();
+    var sw = Stopwatch.StartNew();
+    while (sw.ElapsedMilliseconds < windowMs)
+    {
+        int b = await ReadByte();
+        if (b >= 0) bytes.Add(b);
+        else if (bytes.Count > 0) break; // got the response, then a gap -> done
+    }
+    return bytes.ToArray();
+}
+
+// Sends an OBD request (echo-locked) and returns the raw response bytes.
+async Task<int[]> QueryObd(byte[] payload)
+{
+    byte[] frame = BuildObd(payload);
+    if (!await SendPaced(frame, 0)) return Array.Empty<int>();
+    return await ReadResponse(700);
+}
+
 // 1) 5-baud init on the break line.
 Console.WriteLine($"== 5-baud init at 0x{address:X2} ==");
 await new KLineFiveBaudInitializer().InitializeAsync(new BreakLineAdapter(sp), address);
@@ -106,24 +128,38 @@ else
     return;
 }
 
-// 4) The ECU answered keyword 0x08, so (per the original: Init = KW2 ^ 0xFF = 0xF7 = 247)
-//    it expects the STANDARD OBD-II header 68 6A F1, not the Triumph D5 F5. Build OBD
-//    frames with that header and try real reads (sweeping a couple of inter-byte gaps).
-foreach (int gap in new[] { 0, 5, 15 })
+// 4) Full PID scan. The ECU is in OBD-II mode (68 6A F1 header). Read the supported-PID
+//    bitmasks (PID 00/20/40), then query and decode every supported PID, plus DTCs.
+var supported = new List<int>();
+foreach (byte basePid in new byte[] { 0x00, 0x20, 0x40 })
 {
-    foreach (var (name, payload) in new (string, byte[])[]
+    int[] resp = await QueryObd(new byte[] { 0x01, basePid });
+    int[]? bits = ObdData(resp, 0x01, basePid);
+    if (bits is null || bits.Length < 4)
     {
-        ("Mode 01 PID 00 (supported PIDs)", new byte[] { 0x01, 0x00 }),
-        ("Mode 01 PID 0C (RPM)",            new byte[] { 0x01, 0x0C }),
-        ("Mode 03 (stored DTCs)",           new byte[] { 0x03 }),
-    })
-    {
-        byte[] frame = BuildObd(payload);
-        Console.WriteLine($"\n== {name} (OBD hdr) @ {gap} ms: TX {Hex(frame)} ==");
-        bool sent = await SendPaced(frame, gap);
-        if (sent) await Capture("   RX (want 41../43..):", 700);
+        Console.WriteLine($"\nSupported bitmask {basePid:X2}: no valid response — stopping scan.");
+        break;
     }
+    Console.WriteLine($"\nSupported {basePid + 1:X2}-{basePid + 0x20:X2}: {Hex(bits.Take(4).Select(x => (byte)x).ToArray())}");
+    for (int i = 0; i < 32; i++)
+        if ((bits[i / 8] & (0x80 >> (i % 8))) != 0) supported.Add(basePid + i + 1);
+    if (!supported.Contains(basePid + 0x20)) break; // next 32-PID range not advertised
 }
+
+Console.WriteLine($"\n== Reading {supported.Count(p => p != 0x20 && p != 0x40)} live PIDs ==");
+foreach (int pid in supported)
+{
+    if (pid == 0x20 || pid == 0x40) continue; // bitmask PIDs, already used
+    int[] resp = await QueryObd(new byte[] { 0x01, (byte)pid });
+    int[]? data = ObdData(resp, 0x01, (byte)pid);
+    Console.WriteLine(data is null
+        ? $"  PID {pid:X2}: no/invalid response [{Hex(resp.Select(x => (byte)x).ToArray())}]"
+        : $"  PID {pid:X2} {DecodePid(pid, data)}");
+}
+
+int[] dtcResp = await QueryObd(new byte[] { 0x03 });
+Console.WriteLine($"\n== Mode 03 stored DTCs: {DecodeDtcs(dtcResp)}");
+Console.WriteLine($"   raw [{Hex(dtcResp.Select(x => (byte)x).ToArray())}]");
 
 Console.WriteLine("\nDone. Copy ALL output above and send it back.");
 
@@ -146,6 +182,52 @@ static byte[] BuildObd(byte[] payload)
     for (int i = 0; i < frame.Length - 1; i++) sum += frame[i];
     frame[^1] = (byte)sum;
     return frame;
+}
+
+// Strips an OBD Mode-01 response (48 6B D1 <mode+40> <pid> <data...> <cks>) to its data
+// bytes, or returns null if it isn't a valid positive response to (mode, pid).
+static int[]? ObdData(int[] resp, byte mode, byte pid)
+{
+    if (resp.Length < 6) return null;
+    if (resp[3] != mode + 0x40) return null;
+    if (resp[4] != pid) return null;
+    return resp[5..^1];
+}
+
+// Decodes common OBD-II Mode 01 PIDs into physical values; raw bytes otherwise.
+static string DecodePid(int pid, int[] d)
+{
+    string raw = "[" + string.Join(" ", d.Select(x => x.ToString("X2"))) + "]";
+    string? v = pid switch
+    {
+        0x04 when d.Length >= 1 => $"Engine load   {d[0] * 100 / 255} %",
+        0x05 when d.Length >= 1 => $"Coolant       {d[0] - 40} C",
+        0x06 when d.Length >= 1 => $"Short fuel trim {(d[0] - 128) * 100 / 128} %",
+        0x07 when d.Length >= 1 => $"Long fuel trim  {(d[0] - 128) * 100 / 128} %",
+        0x0B when d.Length >= 1 => $"MAP           {d[0]} kPa",
+        0x0C when d.Length >= 2 => $"RPM           {(d[0] * 256 + d[1]) / 4}",
+        0x0D when d.Length >= 1 => $"Speed         {d[0]} km/h",
+        0x0E when d.Length >= 1 => $"Timing adv    {d[0] / 2.0 - 64:0.0} deg",
+        0x0F when d.Length >= 1 => $"Intake air    {d[0] - 40} C",
+        0x11 when d.Length >= 1 => $"Throttle      {d[0] * 100 / 255} %",
+        _ => null
+    };
+    return v is null ? $"= {raw}" : $"= {v,-22} {raw}";
+}
+
+// Decodes a Mode 03 response (48 6B D1 43 <code pairs...> cks) into DTC strings.
+static string DecodeDtcs(int[] resp)
+{
+    if (resp.Length < 5 || resp[3] != 0x43) return "(no/invalid Mode 03 response)";
+    var codes = new List<string>();
+    for (int i = 4; i + 1 < resp.Length - 1; i += 2)
+    {
+        int a = resp[i], b = resp[i + 1];
+        if (a == 0 && b == 0) continue;
+        char system = "PCBU"[(a >> 6) & 3];
+        codes.Add($"{system}{(a >> 4) & 3}{(a & 0xF):X}{(b >> 4):X}{(b & 0xF):X}");
+    }
+    return codes.Count == 0 ? "none" : string.Join(", ", codes);
 }
 
 // Precise short delay (Task.Delay has ~15 ms granularity, too coarse for P4 timing).
