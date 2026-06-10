@@ -50,7 +50,8 @@ data-dense style of teslax.app / ecubooster.com.
 |---|---|
 | Framework | Avalonia 11, .NET 8, Fluent theme |
 | Theme | **Light default** + dark option (user toggle) |
-| Accent color (v1) | User-selectable: white, teal, blue, green, yellow, red, black (theme-aware) |
+| Accent color (v1) | User-selectable, **default teal**: white, teal, blue, green, yellow, red, black (theme-aware) |
+| Settings | Theme + accent **persist** to a small settings file across sessions |
 | MVVM | `CommunityToolkit.Mvvm` (MIT) |
 | Dashboard layout | **Hybrid** — hero radial gauges + tile grid (option C) |
 | Hero gauges (v1 default) | **RPM + Coolant** |
@@ -149,8 +150,9 @@ fed by `LoggingTransport` events. A "pause" toggle and "clear" button.
 **Settings** (a small control set in the connection bar or a settings flyout): a
 **light/dark theme toggle** (default light) and an **accent-color picker** (white, teal,
 blue, green, yellow, red, black — rendered theme-aware for contrast). These bind to app-level
-theme resources so all gauges/tiles/controls pick them up live. (Persistence to disk is a
-nice-to-have; see §13.)
+theme resources so all gauges/tiles/controls pick them up live. Theme + accent **persist** to
+a small settings file and are restored on launch. Default theme **light**, default accent
+**teal**.
 
 ## 7. Extensibility (v2-readiness) — first-class in v1
 
@@ -240,11 +242,10 @@ Bottom-up, each step runnable/testable:
 - **K-line throughput** — a full PID cycle is ~1–2 s; gauges update per-PID as values arrive,
   so the UI feels live even though the bus is slow. Hero PIDs can be polled more often if needed.
 
-## 13. Open questions (non-blocking)
+## 13. Resolved decisions
 
-- Exact weighting of hero vs. non-hero PID polling (start: heroes every cycle, others
-  interleaved one-per-cycle; tune on hardware).
-- Whether theme + accent settings persist to disk in v1 or reset per session (lean: persist
-  a small settings file).
-- Default accent (lean: teal) — the full picker (white/teal/blue/green/yellow/red/black) ships
-  in v1 regardless.
+- **Hero PIDs are weighted highest** — RPM + coolant polled every cycle; non-hero PIDs
+  interleaved one-per-cycle (exact ratio tunable on hardware).
+- **Theme + accent persist** to a small settings file, restored on launch.
+- **Default theme = light, default accent = teal**; full accent picker
+  (white/teal/blue/green/yellow/red/black) ships in v1.
