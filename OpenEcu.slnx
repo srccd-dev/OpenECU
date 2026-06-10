@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/OpenEcu.App/OpenEcu.App.csproj" />
     <Project Path="src/OpenEcu.Core/OpenEcu.Core.csproj" />
     <Project Path="src/OpenEcu.Probe/OpenEcu.Probe.csproj" />
     <Project Path="src/OpenEcu.Transport.Serial/OpenEcu.Transport.Serial.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/OpenEcu.App.Tests/OpenEcu.App.Tests.csproj" />
     <Project Path="tests/OpenEcu.Core.Tests/OpenEcu.Core.Tests.csproj" />
     <Project Path="tests/OpenEcu.Transport.Serial.Tests/OpenEcu.Transport.Serial.Tests.csproj" />
   </Folder>
