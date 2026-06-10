@@ -41,6 +41,27 @@ async Task Capture(string label, int windowMs)
     if (total == 0) Console.WriteLine("     (nothing)");
 }
 
+// Sends a frame the way the original does: one byte at a time, waiting for each byte's
+// echo before sending the next. On the single-wire K-line that echo round-trip provides
+// the inter-byte gap (P4) the ECU needs. Returns false if an echo never came back.
+async Task<bool> SendPaced(byte[] frame)
+{
+    foreach (byte tx in frame)
+    {
+        await sp.WriteAsync(new byte[] { tx });
+        var sw = Stopwatch.StartNew();
+        bool echoed = false;
+        while (sw.ElapsedMilliseconds < 150)
+        {
+            int e = await ReadByte();
+            if (e == tx) { echoed = true; break; }
+            if (e >= 0) Console.WriteLine($"     (unexpected {e:X2} while pacing {tx:X2})");
+        }
+        if (!echoed) { Console.WriteLine($"     (no echo for {tx:X2} — aborting frame)"); return false; }
+    }
+    return true;
+}
+
 // 1) 5-baud init on the break line.
 Console.WriteLine($"== 5-baud init at 0x{address:X2} ==");
 await new KLineFiveBaudInitializer().InitializeAsync(new BreakLineAdapter(sp), address);
@@ -84,21 +105,23 @@ else
     return;
 }
 
-// 4) Probe the gate. The original sends SecurityAccess (0x27) FIRST, before any data
-//    request, so try that first and capture whether the ECU returns a seed (67 03 02 ...).
+// 4) Now that the frame is paced (echo-locked), the echo is consumed during SendPaced,
+//    so the capture below shows ONLY the ECU's actual response.
 var probes = new (string Name, byte[] Payload)[]
 {
-    ("SecurityAccess request seed (27 03 02)", new byte[] { 0x27, 0x03, 0x02 }),
-    ("TesterPresent (3E)",                     new byte[] { 0x3E }),
-    ("Mode 01 PID 00 (control)",               new byte[] { 0x01, 0x00 }),
+    ("TesterPresent (3E)",                      new byte[] { 0x3E }),
+    ("Mode 01 PID 00 (supported PIDs)",         new byte[] { 0x01, 0x00 }),
+    ("Mode 03 (stored DTCs)",                   new byte[] { 0x03 }),
+    ("SecurityAccess request seed (27 03 02)",  new byte[] { 0x27, 0x03, 0x02 }),
+    ("Triumph ID (21 80)",                      new byte[] { 0x21, 0x80 }),
 };
 
 foreach (var (name, payload) in probes)
 {
     byte[] frame = KLineFrameBuilder.BuildRequest(payload, KLineMode.Iso9141);
-    Console.WriteLine($"\n== {name}: TX {Hex(frame)} ==");
-    await sp.WriteAsync(frame);
-    await Capture("   RX (may include a TX echo first):", 800);
+    Console.WriteLine($"\n== {name}: TX {Hex(frame)} (echo-locked) ==");
+    bool sent = await SendPaced(frame);
+    if (sent) await Capture("   RX (ECU response):", 800);
 }
 
 Console.WriteLine("\nDone. Copy ALL output above and send it back.");
