@@ -447,7 +447,7 @@ Add inside `KLineObdSessionTests`, before the closing brace:
     {
         var ecu = new FakeEcu(new()
         {
-            ["0105"] = new byte[] { 0x48, 0x6B, 0xD1, 0x41, 0x05, 0x44, 0x9A }, // coolant 0x44 -> 28 C
+            ["0105"] = new byte[] { 0x48, 0x6B, 0xD1, 0x41, 0x05, 0x44, 0x0E }, // coolant 0x44 -> 28 C
         }, connected: true);
         await ecu.OpenAsync();
         var session = new KLineObdSession(ecu, ecu, delay: NoDelay);
@@ -491,7 +491,7 @@ Add inside `KLineObdSessionTests`, before the closing brace:
     }
 ```
 
-(Checksum note for the coolant vector: `0x48+0x6B+0xD1+0x41+0x05+0x44 = 0x19A` → `0x9A`.)
+(Checksum note for the coolant vector: `0x48+0x6B+0xD1+0x41+0x05+0x44 = 0x20E` → `0x0E`.)
 
 - [ ] **Step 2: Run tests to verify they fail**
 
