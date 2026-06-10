@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/OpenEcu.App/OpenEcu.App.csproj" />
     <Project Path="src/OpenEcu.Core/OpenEcu.Core.csproj" />
+    <Project Path="src/OpenEcu.Desktop/OpenEcu.Desktop.csproj" />
     <Project Path="src/OpenEcu.Probe/OpenEcu.Probe.csproj" />
     <Project Path="src/OpenEcu.Transport.Serial/OpenEcu.Transport.Serial.csproj" />
   </Folder>
