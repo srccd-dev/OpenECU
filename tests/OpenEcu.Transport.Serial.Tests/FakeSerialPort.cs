@@ -11,6 +11,10 @@ public sealed class FakeSerialPort : ISerialPort
     public bool IsOpen { get; private set; }
     public IReadOnlyList<byte> Written => _written;
 
+    private readonly List<bool> _breakToggles = new();
+    public IReadOnlyList<bool> BreakToggles => _breakToggles;
+    public void SetBreak(bool on) => _breakToggles.Add(on);
+
     public void EnqueueRead(params byte[] data)
     {
         foreach (byte b in data) _toRead.Enqueue(b);

@@ -11,4 +11,6 @@ public interface ISerialPort : IAsyncDisposable
     void Close();
     Task WriteAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default);
     Task<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default);
+    /// <summary>Sets the break (line-low) condition. true = line held low; false = idle high.</summary>
+    void SetBreak(bool on);
 }
