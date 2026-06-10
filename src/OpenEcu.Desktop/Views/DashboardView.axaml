@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:OpenEcu.Desktop.Controls"
+             xmlns:vm="clr-namespace:OpenEcu.App.ViewModels;assembly=OpenEcu.App"
+             x:Class="OpenEcu.Desktop.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+  <ScrollViewer Padding="16">
+    <StackPanel Spacing="16">
+      <ItemsControl ItemsSource="{Binding Heroes}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:MetricViewModel">
+            <Border Margin="8" Width="220" Height="150">
+              <c:RadialGauge Value="{Binding Value, FallbackValue=0}"
+                             Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
+                             ValueText="{Binding Display}" Label="{Binding Name}" />
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <ItemsControl ItemsSource="{Binding Tiles}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:MetricViewModel">
+            <Border Margin="6" Width="150" Padding="12"
+                    Background="{DynamicResource SystemControlBackgroundListLowBrush}"
+                    CornerRadius="8">
+              <StackPanel>
+                <TextBlock Text="{Binding Name}" FontSize="12" Opacity="0.7" />
+                <TextBlock Text="{Binding Display}" FontSize="22" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <Border Background="#33CC8800" CornerRadius="8" Padding="10"
+              IsVisible="{Binding Dtcs.Count}">
+        <ItemsControl ItemsSource="{Binding Dtcs}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" /></DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
