@@ -29,6 +29,10 @@ data-dense style of teslax.app / ecubooster.com.
   panel), **Console** (raw protocol log).
 - **Constant** live polling of supported PIDs + periodic DTC refresh (~5 s) — essential
   real-time feedback for tuning, treated as a core reliability requirement (see §8).
+- An **optional Racing Dashboard** mode — a sporty, analog-tachometer dashboard *skin* the
+  user can toggle to (a fun perk). The standard dashboard ships first (plan 9); the Racing
+  mode is a focused fast-follow (plan 10), enabled by the data-driven/pluggable architecture
+  (see §7).
 - **Light and dark themes** (light is the default; dark for power users), with a
   user-selectable accent color (white, teal, blue, green, yellow, red, black).
 
@@ -173,6 +177,17 @@ the ecubooster/TuneECU-style fuel/ignition surface) is a planned sibling of `Rad
 and will share the accent/color-ramp concept. **Not built in v1**; v1 only guarantees the
 shell, navigation, and data flow accommodate it. (Heat-map *data* depends on reading ECU map
 tables — v2/write scope.)
+
+**Optional Racing Dashboard (plan 10).** A second, optional dashboard *mode* — an alternate
+skin, not a separate data path — reached via a **Standard / Racing** toggle. Inspired by
+race-cockpit displays (e.g. UMA Racing): a large **analog tachometer** (arc + tick marks +
+sweeping needle + redline zone) with a digital RPM readout and **gear indicator** at its
+center, a prominent **speed**, and a few key metrics (throttle, battery voltage, engine temp,
+spark advance) as angular, high-contrast readouts in a vibrant modern style. It binds to the
+same `LiveDataService` metrics and `DashboardLayout` (same data-driven slots), so it needs
+only one new custom control — an `AnalogTachometer` (sibling of `RadialGauge`) — plus a racing
+layout. **Not built in v1/plan 9**; built in plan 10 once the core app runs. The pluggable
+view system + data-driven layout accommodate it without rework.
 
 **Map difference reporting (v2).** A headline v2 capability: when a user edits a map, they
 should never guess what changed — OpenECU stores the **original map as a baseline** and shows
