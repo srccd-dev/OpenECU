@@ -14,11 +14,17 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly Func<IReadOnlyList<string>> _portProvider;
     private LiveConnection? _connection;
     private CancellationTokenSource? _loopCts;
+    private readonly AppSettings _settings;
+    private readonly string _settingsPath;
 
-    public MainViewModel(IConnectionFactory factory, Func<IReadOnlyList<string>>? portProvider = null)
+    public MainViewModel(IConnectionFactory factory, Func<IReadOnlyList<string>>? portProvider = null, string? settingsPath = null)
     {
         _factory = factory;
         _portProvider = portProvider ?? (() => SerialPortEnumerator.GetPortNames());
+        _settingsPath = settingsPath ?? AppSettings.DefaultPath;
+        _settings = AppSettings.Load(_settingsPath);
+        _darkMode = _settings.DarkMode;
+        _accent = _settings.Accent;
         RefreshPorts();
     }
 
@@ -27,6 +33,13 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private string? _selectedPort;
     [ObservableProperty] private ConnectionState _state = ConnectionState.Disconnected;
     [ObservableProperty] private string _status = "Disconnected";
+    [ObservableProperty] private bool _darkMode;
+    [ObservableProperty] private string _accent = "teal";
+
+    public IReadOnlyList<string> Accents => AppSettings.Accents;
+
+    partial void OnDarkModeChanged(bool value) { _settings.DarkMode = value; _settings.Save(_settingsPath); }
+    partial void OnAccentChanged(string value) { _settings.Accent = value; _settings.Save(_settingsPath); }
 
     /// <summary>The connected live data service (null until connected). Views bind metrics from it.</summary>
     public LiveDataService? Live => _connection?.Service;
