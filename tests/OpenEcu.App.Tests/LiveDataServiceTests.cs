@@ -129,4 +129,21 @@ public class LiveDataServiceTests
 
         svc.Metrics.First(m => m.Pid == 0x05).IsStatic.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task ClearDtcsAsync_clears_on_the_ecu_and_refreshes()
+    {
+        var fake = new FakeObdSession();
+        fake.Supported.Add(0x0C);
+        fake.Dtcs = new[] { "P1502" };
+        var svc = new LiveDataService(fake);
+        await svc.ConnectAsync();
+        await svc.PollOnceAsync();
+        svc.Dtcs.Should().Equal("P1502");
+
+        await svc.ClearDtcsAsync();
+
+        fake.ClearCalls.Should().Be(1);
+        svc.Dtcs.Should().BeEmpty();
+    }
 }

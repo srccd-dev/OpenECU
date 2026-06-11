@@ -85,6 +85,13 @@ public sealed partial class LiveDataService : ObservableObject, IAsyncDisposable
         LastUpdate = DateTime.UtcNow;
     }
 
+    /// <summary>Clears stored DTCs on the ECU, then re-reads them.</summary>
+    public async Task ClearDtcsAsync(CancellationToken ct = default)
+    {
+        await _session.ClearDtcsAsync(ct);
+        Dtcs = await _session.ReadDtcsAsync(ct);
+    }
+
     /// <summary>Continuous loop until cancelled. Callers run this on a background task.</summary>
     public async Task RunAsync(CancellationToken ct)
     {
