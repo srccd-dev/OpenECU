@@ -27,10 +27,20 @@ public class DiagnosticsViewModelTests
     }
 
     [Fact]
-    public async Task Clear_codes_is_disabled_in_v1()
+    public async Task Clear_codes_is_enabled_and_clears_through_the_service()
     {
-        var svc = await Connected(0x0C);
+        var ecu = new FakeObdSession();
+        ecu.Supported.Add(0x0C);
+        ecu.Dtcs = new[] { "P1502" };
+        var svc = new LiveDataService(ecu);
+        await svc.ConnectAsync();
+        await svc.PollOnceAsync();
+
         var vm = new DiagnosticsViewModel(svc);
-        vm.CanClearCodes.Should().BeFalse();
+        vm.CanClearCodes.Should().BeTrue();
+
+        await vm.ClearCodesCommand.ExecuteAsync(null);
+
+        ecu.ClearCalls.Should().Be(1);
     }
 }
