@@ -8,4 +8,7 @@ public interface IObdSession : IAsyncDisposable
     Task<IReadOnlyList<byte>> ReadSupportedPidsAsync(CancellationToken ct = default);
     Task<PidReading> ReadPidAsync(byte pid, CancellationToken ct = default);
     Task<IReadOnlyList<string>> ReadDtcsAsync(CancellationToken ct = default);
+
+    /// <summary>Clears stored diagnostic trouble codes (OBD-II Mode 04).</summary>
+    Task ClearDtcsAsync(CancellationToken ct = default);
 }

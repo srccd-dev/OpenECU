@@ -99,6 +99,13 @@ public sealed class KLineObdSession : IObdSession
         return DtcDecoder.Decode(resp.Payload);
     }
 
+    public async Task ClearDtcsAsync(CancellationToken ct = default)
+    {
+        ObdResponse resp = await RequestAsync(new byte[] { 0x04 }, ct);
+        if (resp.ServiceId != 0x44)
+            throw new InvalidDataException($"Mode 04 (clear codes) rejected: SID 0x{resp.ServiceId:X2}.");
+    }
+
     public ValueTask DisposeAsync() => _transport.DisposeAsync();
 
     // Sends each byte then waits for its echo (the single-wire K-line echoes TX).
