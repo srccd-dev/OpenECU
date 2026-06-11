@@ -8,6 +8,7 @@
     <Border DockPanel.Dock="Top" Padding="10" Background="{DynamicResource SystemControlBackgroundListLowBrush}">
       <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
         <ComboBox ItemsSource="{Binding AvailablePorts}" SelectedItem="{Binding SelectedPort}" MinWidth="120" />
+        <ComboBox ItemsSource="{Binding Adapters}" SelectedItem="{Binding SelectedAdapter}" MinWidth="90" />
         <Button Content="Refresh" Command="{Binding RefreshPorts_Command}" />
         <Button Content="Connect" Command="{Binding ConnectCommand}" />
         <Button Content="Disconnect" Command="{Binding DisconnectCommand}" />

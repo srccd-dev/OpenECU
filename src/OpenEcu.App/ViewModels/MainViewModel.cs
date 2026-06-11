@@ -26,6 +26,7 @@ public sealed partial class MainViewModel : ObservableObject
         _darkMode = _settings.DarkMode;
         _accent = _settings.Accent;
         _racingMode = _settings.RacingMode;
+        _selectedAdapter = Enum.TryParse<AdapterKind>(_settings.Adapter, out var a) ? a : AdapterKind.Cable;
         RefreshPorts();
     }
 
@@ -37,12 +38,15 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _darkMode;
     [ObservableProperty] private string _accent = "teal";
     [ObservableProperty] private bool _racingMode;
+    [ObservableProperty] private AdapterKind _selectedAdapter;
 
     public IReadOnlyList<string> Accents => AppSettings.Accents;
+    public IReadOnlyList<AdapterKind> Adapters { get; } = new[] { AdapterKind.Cable, AdapterKind.Elm327 };
 
     partial void OnDarkModeChanged(bool value) { _settings.DarkMode = value; _settings.Save(_settingsPath); }
     partial void OnAccentChanged(string value) { _settings.Accent = value; _settings.Save(_settingsPath); }
     partial void OnRacingModeChanged(bool value) { _settings.RacingMode = value; _settings.Save(_settingsPath); }
+    partial void OnSelectedAdapterChanged(AdapterKind value) { _settings.Adapter = value.ToString(); _settings.Save(_settingsPath); }
 
     /// <summary>The connected live data service (null until connected). Views bind metrics from it.</summary>
     public LiveDataService? Live => _connection?.Service;
@@ -68,7 +72,7 @@ public sealed partial class MainViewModel : ObservableObject
         Status = $"Connecting to {SelectedPort}…";
         try
         {
-            _connection = _factory.Create(SelectedPort);
+            _connection = _factory.Create(SelectedPort, SelectedAdapter);
             await _connection.Log.OpenAsync();
             await _connection.Service.ConnectAsync();
             OnPropertyChanged(nameof(Live));

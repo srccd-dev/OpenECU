@@ -7,6 +7,7 @@ public sealed class AppSettings
 {
     public bool DarkMode { get; set; }
     public string Accent { get; set; } = "teal";
+    public string Adapter { get; set; } = "Cable";
     public bool RacingMode { get; set; }
 
     /// <summary>The accent colors offered in the picker.</summary>
