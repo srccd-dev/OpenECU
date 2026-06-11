@@ -1,4 +1,6 @@
 using OpenEcu.Core.Obd;
+using OpenEcu.Core.Security;
+using OpenEcu.Core.Transport;
 using OpenEcu.Transport.Serial;
 
 // Usage: dotnet run --project src/OpenEcu.Probe -- [COMx]
@@ -13,6 +15,36 @@ try { port.Open(); }
 catch (Exception ex) { Console.WriteLine($"Could not open {portName}: {ex.GetType().Name}: {ex.Message}"); return; }
 
 var transport = new SerialPortTransport(port);
+
+string mode = args.Length > 1 ? args[1] : "scan";
+if (mode == "securityaccess")
+{
+    var logging = new LoggingTransport(transport);
+    logging.BytesWritten += b => Console.WriteLine($"  TX {BitConverter.ToString(b)}");
+    logging.BytesRead    += b => Console.WriteLine($"  RX {BitConverter.ToString(b)}");
+    await using var sagem = new SagemSession(logging, transport);
+    try
+    {
+        Console.WriteLine("Connecting (5-baud init + keyword handshake)...");
+        await sagem.ConnectAsync();
+        Console.WriteLine("Connected. StartDiagnosticSession (31 90 11)...");
+        ObdResponse diag = await sagem.StartDiagnosticAsync();
+        Console.WriteLine($"  start-diag reply: SID 0x{diag.ServiceId:X2} [{BitConverter.ToString(diag.Payload)}]");
+        Console.WriteLine("SecurityAccess: request seed + send computed key (27 03 02)...");
+        await sagem.UnlockAsync(SecurityLevel.Read);
+        Console.WriteLine("\n*** ACCESS GRANTED — ECU unlocked. ***");
+    }
+    catch (SecurityAccessException ex)
+    {
+        Console.WriteLine($"\n*** Unlock rejected — NRC 0x{ex.Nrc:X2}. {ex.Message}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Security-access error: {ex.GetType().Name}: {ex.Message}");
+    }
+    return;
+}
+
 var session = new KLineObdSession(transport, transport); // same object is transport + break line
 
 try
