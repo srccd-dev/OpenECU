@@ -36,12 +36,15 @@ public sealed partial class MetricViewModel : ObservableObject
     private int _unchanged;
     private const int StaticThreshold = 5; // identical reads in a row before flagging static
 
+    /// <summary>True once this PID has returned the same bytes for several reads in a row.</summary>
+    public bool Repeated { get; private set; }
+
     /// <summary>Apply a fresh reading from the ECU.</summary>
     public void Update(PidReading reading)
     {
         bool same = Raw.AsSpan().SequenceEqual(reading.Raw); // compare to the previous reading before reassigning
         _unchanged = same ? _unchanged + 1 : 0;
-        IsStatic = _unchanged >= StaticThreshold;
+        Repeated = _unchanged >= StaticThreshold;
 
         Raw = reading.Raw;
         Value = reading.Value;
