@@ -178,16 +178,19 @@ and will share the accent/color-ramp concept. **Not built in v1**; v1 only guara
 shell, navigation, and data flow accommodate it. (Heat-map *data* depends on reading ECU map
 tables — v2/write scope.)
 
-**Optional Racing Dashboard (plan 10).** A second, optional dashboard *mode* — an alternate
+**Optional Racing Dashboard (plan 11).** A second, optional dashboard *mode* — an alternate
 skin, not a separate data path — reached via a **Standard / Racing** toggle. Inspired by
-race-cockpit displays (e.g. UMA Racing): a large **analog tachometer** (arc + tick marks +
-sweeping needle + redline zone) with a digital RPM readout and **gear indicator** at its
-center, a prominent **speed**, and a few key metrics (throttle, battery voltage, engine temp,
-spark advance) as angular, high-contrast readouts in a vibrant modern style. It binds to the
-same `LiveDataService` metrics and `DashboardLayout` (same data-driven slots), so it needs
-only one new custom control — an `AnalogTachometer` (sibling of `RadialGauge`) — plus a racing
-layout. **Not built in v1/plan 9**; built in plan 10 once the core app runs. The pluggable
-view system + data-driven layout accommodate it without rework.
+race-cockpit displays (e.g. UMA Racing), modernized: a large **analog tachometer** (arc +
+tick marks + sweeping needle + redline zone) with a digital RPM readout, a **gear box** (kept
+as a greyed `—/n/a` since OBD-II doesn't expose gear on the 955i — retained for the look and
+for bikes that *do* report it), a prominent **speed**, and a **left-aligned** stack of angular
+"race readout" bars for the metrics we actually read (throttle, coolant, timing advance, O2).
+Dark cockpit by default, but **honors the app light/dark theme** and accent. **Tach range is
+configurable** (`TachConfig` = max + redline RPM; default redline 9,500 / max 11,000 for the
+955i) so it can adjust per model later. It binds to the same `LiveDataService` metrics, so it
+needs one new custom control — an `AnalogTachometer` (sibling of `RadialGauge`) — plus the
+racing layout and the mode toggle. **Not built in v1**; built in plan 11 once the core app
+runs. The pluggable view system + data-driven layout accommodate it without rework.
 
 **Map difference reporting (v2).** A headline v2 capability: when a user edits a map, they
 should never guess what changed — OpenECU stores the **original map as a baseline** and shows
