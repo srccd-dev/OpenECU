@@ -81,6 +81,7 @@ public sealed partial class LiveDataService : ObservableObject, IAsyncDisposable
             catch { /* transient; retry next cadence */ }
         }
 
+        SuppressStaticUnlessEngineRunning();
         LastUpdate = DateTime.UtcNow;
     }
 
@@ -110,6 +111,17 @@ public sealed partial class LiveDataService : ObservableObject, IAsyncDisposable
         if (!_byPid.TryGetValue(pid, out var vm)) return;
         try { vm.Update(await _session.ReadPidAsync(pid, ct)); }
         catch { vm.IsStale = true; }
+    }
+
+    private const double EngineRunningRpm = 400;
+
+    // Static flags are only meaningful with the engine running; with it off everything is
+    // unchanging, so clear them to avoid misleading the user.
+    private void SuppressStaticUnlessEngineRunning()
+    {
+        bool running = _byPid.TryGetValue(0x0C, out var rpm) && rpm.Value is double v && v >= EngineRunningRpm;
+        if (running) return;
+        foreach (MetricViewModel m in Metrics) m.IsStatic = false;
     }
 
     public ValueTask DisposeAsync() => _session.DisposeAsync();

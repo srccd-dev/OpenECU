@@ -39,6 +39,7 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.Live): UpdateViews(); break;
             case nameof(MainViewModel.DarkMode): ApplyTheme(); break;
             case nameof(MainViewModel.Accent): ApplyAccent(); break;
+            case nameof(MainViewModel.RacingMode): UpdateViews(); break;
         }
     }
 
@@ -63,7 +64,10 @@ public partial class MainWindow : Window
 
         if (_vm?.Live is LiveDataService live)
         {
-            if (dash is not null) dash.Content = new DashboardView { DataContext = new DashboardViewModel(live) };
+            if (dash is not null)
+                dash.Content = _vm!.RacingMode
+                    ? new RacingDashboardView { DataContext = new RacingDashboardViewModel(live) }
+                    : new DashboardView { DataContext = new DashboardViewModel(live) };
             if (diag is not null) diag.Content = new DiagnosticsView { DataContext = new DiagnosticsViewModel(live) };
 
             _console = new ConsoleViewModel();

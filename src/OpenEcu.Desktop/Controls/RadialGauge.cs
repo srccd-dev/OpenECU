@@ -68,7 +68,7 @@ public sealed class RadialGauge : Control
         using (var ctx = geo.Open())
         {
             ctx.BeginFigure(start, false);
-            ctx.ArcTo(end, new Size(r, r), 0, frac > 0.5, SweepDirection.Clockwise);
+            ctx.ArcTo(end, new Size(r, r), 0, isLargeArc: false, SweepDirection.Clockwise);
             ctx.EndFigure(false);
         }
         return geo;
