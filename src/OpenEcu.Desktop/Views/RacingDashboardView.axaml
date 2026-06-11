@@ -29,13 +29,23 @@
       <ItemsControl ItemsSource="{Binding Readouts}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:MetricViewModel">
-            <Grid ColumnDefinitions="110,10,*,10,90" Margin="0,4">
-              <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Opacity="0.75" VerticalAlignment="Center" />
-              <ProgressBar Grid.Column="2" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
-                           Value="{Binding Value, FallbackValue=0}" Height="8"
-                           Foreground="{DynamicResource AppAccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="4" Text="{Binding Display}" FontSize="16" TextAlignment="Right" VerticalAlignment="Center" />
-            </Grid>
+            <Border Margin="6,3,0,3" Padding="12,7" CornerRadius="4"
+                    Background="{DynamicResource SystemControlBackgroundListLowBrush}">
+              <Border.RenderTransform>
+                <SkewTransform AngleX="-10" />
+              </Border.RenderTransform>
+              <Grid ColumnDefinitions="110,10,*,10,90">
+                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Opacity="0.75" VerticalAlignment="Center">
+                  <TextBlock.RenderTransform><SkewTransform AngleX="10" /></TextBlock.RenderTransform>
+                </TextBlock>
+                <ProgressBar Grid.Column="2" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
+                             Value="{Binding Value, FallbackValue=0}" Height="8"
+                             Foreground="{DynamicResource AppAccentBrush}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="4" Text="{Binding Display}" FontSize="16" TextAlignment="Right" VerticalAlignment="Center">
+                  <TextBlock.RenderTransform><SkewTransform AngleX="10" /></TextBlock.RenderTransform>
+                </TextBlock>
+              </Grid>
+            </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
