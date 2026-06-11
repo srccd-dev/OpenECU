@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:OpenEcu.App.ViewModels;assembly=OpenEcu.App"
+             xmlns:c="clr-namespace:OpenEcu.Desktop.Controls"
+             x:Class="OpenEcu.Desktop.Views.RacingDashboardView"
+             x:DataType="vm:RacingDashboardViewModel">
+  <Grid ColumnDefinitions="Auto,20,*" Margin="16">
+    <c:AnalogTachometer Grid.Column="0" Width="320" Height="320"
+                        Value="{Binding Rpm.Value, FallbackValue=0}"
+                        MaxRpm="{Binding Tach.MaxRpm}" RedlineRpm="{Binding Tach.RedlineRpm}"
+                        Accent="{DynamicResource AppAccentBrush}" />
+
+    <StackPanel Grid.Column="2" Spacing="14" VerticalAlignment="Center">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="0">
+          <TextBlock Text="SPEED" FontSize="12" Opacity="0.6" />
+          <TextBlock Text="{Binding Speed.Display, FallbackValue='—'}" FontSize="40" />
+        </StackPanel>
+        <Border Grid.Column="1" BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                BorderThickness="1" CornerRadius="10" Padding="14,6" VerticalAlignment="Top">
+          <StackPanel>
+            <TextBlock Text="{Binding Gear}" FontSize="28" HorizontalAlignment="Center" />
+            <TextBlock Text="GEAR · n/a" FontSize="10" Opacity="0.5" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <ItemsControl ItemsSource="{Binding Readouts}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:MetricViewModel">
+            <Grid ColumnDefinitions="110,10,*,10,90" Margin="0,4">
+              <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Opacity="0.75" VerticalAlignment="Center" />
+              <ProgressBar Grid.Column="2" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
+                           Value="{Binding Value, FallbackValue=0}" Height="8"
+                           Foreground="{DynamicResource AppAccentBrush}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="4" Text="{Binding Display}" FontSize="16" TextAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </Grid>
+</UserControl>
