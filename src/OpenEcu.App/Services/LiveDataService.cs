@@ -81,7 +81,7 @@ public sealed partial class LiveDataService : ObservableObject, IAsyncDisposable
             catch { /* transient; retry next cadence */ }
         }
 
-        SuppressStaticUnlessEngineRunning();
+        RefreshStaticFlags();
         LastUpdate = DateTime.UtcNow;
     }
 
@@ -115,13 +115,14 @@ public sealed partial class LiveDataService : ObservableObject, IAsyncDisposable
 
     private const double EngineRunningRpm = 400;
 
-    // Static flags are only meaningful with the engine running; with it off everything is
-    // unchanging, so clear them to avoid misleading the user.
-    private void SuppressStaticUnlessEngineRunning()
+    // Compute the static flag once at the end of the cycle so it never flickers mid-poll.
+    // A PID is "static" only if it has repeated AND the engine is running (else everything
+    // looks static at idle/off, which is meaningless).
+    private void RefreshStaticFlags()
     {
         bool running = _byPid.TryGetValue(0x0C, out var rpm) && rpm.Value is double v && v >= EngineRunningRpm;
-        if (running) return;
-        foreach (MetricViewModel m in Metrics) m.IsStatic = false;
+        foreach (MetricViewModel m in Metrics)
+            m.IsStatic = m.Repeated && running;
     }
 
     public ValueTask DisposeAsync() => _session.DisposeAsync();

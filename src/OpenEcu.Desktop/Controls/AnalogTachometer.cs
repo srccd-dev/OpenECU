@@ -17,14 +17,17 @@ public sealed class AnalogTachometer : Control
         AvaloniaProperty.Register<AnalogTachometer, double>(nameof(RedlineRpm), 9500);
     public static readonly StyledProperty<IBrush> AccentProperty =
         AvaloniaProperty.Register<AnalogTachometer, IBrush>(nameof(Accent), Brushes.Teal);
+    public static readonly StyledProperty<IBrush> ForegroundProperty =
+        AvaloniaProperty.Register<AnalogTachometer, IBrush>(nameof(Foreground), Brushes.White);
 
     static AnalogTachometer() =>
-        AffectsRender<AnalogTachometer>(ValueProperty, MaxRpmProperty, RedlineRpmProperty, AccentProperty);
+        AffectsRender<AnalogTachometer>(ValueProperty, MaxRpmProperty, RedlineRpmProperty, AccentProperty, ForegroundProperty);
 
     public double Value { get => GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
     public double MaxRpm { get => GetValue(MaxRpmProperty); set => SetValue(MaxRpmProperty, value); }
     public double RedlineRpm { get => GetValue(RedlineRpmProperty); set => SetValue(RedlineRpmProperty, value); }
     public IBrush Accent { get => GetValue(AccentProperty); set => SetValue(AccentProperty, value); }
+    public IBrush Foreground { get => GetValue(ForegroundProperty); set => SetValue(ForegroundProperty, value); }
 
     private const double A0 = 210, A1 = -30;            // sweep, degrees
     private static readonly Color Red = Color.FromRgb(0xE2, 0x4B, 0x4A);
@@ -62,12 +65,12 @@ public sealed class AnalogTachometer : Control
             DrawText(ctx, t.ToString(), PointAt(c, radius - 30, f), 13, red ? new SolidColorBrush(Red) : tickGray);
         }
 
-        var needle = new Pen(new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF7)), 4) { LineCap = PenLineCap.Round };
+        var needle = new Pen(Foreground, 4) { LineCap = PenLineCap.Round };
         ctx.DrawLine(needle, c, PointAt(c, radius - 20, valFrac));
-        ctx.DrawEllipse(new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF7)), null, c, 6, 6);
+        ctx.DrawEllipse(Foreground, null, c, 6, 6);
 
         DrawText(ctx, ((int)Math.Round(Value)).ToString(), new Point(c.X, c.Y + radius * 0.42), radius * 0.30,
-            new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF7)), center: true);
+            Foreground, center: true);
         DrawText(ctx, "rpm", new Point(c.X, c.Y + radius * 0.66), 12,
             new SolidColorBrush(Color.FromArgb(200, 130, 140, 155)), center: true);
     }
