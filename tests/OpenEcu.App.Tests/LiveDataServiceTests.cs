@@ -99,4 +99,34 @@ public class LiveDataServiceTests
         fake.DtcCalls.Should().Be(1);
         svc.Dtcs.Should().Equal("P1502");
     }
+
+    [Fact]
+    public async Task Static_is_suppressed_when_engine_is_off()
+    {
+        var fake = new FakeObdSession();
+        fake.Supported.AddRange(new byte[] { 0x0C, 0x05 });
+        fake.Readings[0x0C] = new PidReading(0x0C, "Engine RPM", 0, "rpm", new byte[] { 0, 0 });
+        fake.Readings[0x05] = new PidReading(0x05, "Coolant", 80, "C", new byte[] { 0x78 });
+        var svc = new LiveDataService(fake);
+        await svc.ConnectAsync();
+
+        for (int i = 0; i < 10; i++) await svc.PollOnceAsync();
+
+        svc.Metrics.First(m => m.Pid == 0x05).IsStatic.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Static_applies_when_engine_running()
+    {
+        var fake = new FakeObdSession();
+        fake.Supported.AddRange(new byte[] { 0x0C, 0x05 });
+        fake.Readings[0x0C] = new PidReading(0x0C, "Engine RPM", 1200, "rpm", new byte[] { 0x12, 0xC0 });
+        fake.Readings[0x05] = new PidReading(0x05, "Coolant", 80, "C", new byte[] { 0x78 }); // never changes
+        var svc = new LiveDataService(fake);
+        await svc.ConnectAsync();
+
+        for (int i = 0; i < 10; i++) await svc.PollOnceAsync();
+
+        svc.Metrics.First(m => m.Pid == 0x05).IsStatic.Should().BeTrue();
+    }
 }
