@@ -174,6 +174,72 @@ if (mode == "readd5")
     return;
 }
 
+if (mode == "tuned5")
+{
+    int addr = args.Length > 2 ? Convert.ToInt32(args[2], 16) : 0x000000;
+    int len  = args.Length > 3 ? int.Parse(args[3]) : 32;
+    var logging = new LoggingTransport(transport);
+    logging.BytesWritten += b => Console.WriteLine($"  TX {BitConverter.ToString(b)}");
+    logging.BytesRead    += b => Console.WriteLine($"  RX {BitConverter.ToString(b)}");
+    await using var sagem = new SagemSession(logging, transport);
+
+    async Task<int> RB() { var b = new byte[1]; int n = await logging.ReadAsync(b); return n > 0 ? b[0] : -1; }
+
+    // Send a payload over the D5/F5 KWP frame (echo-locked), return the response payload (header+checksum stripped).
+    async Task<byte[]> SendD5(byte[] payload)
+    {
+        var frame = new byte[3 + payload.Length + 1];
+        frame[0] = (byte)(0x80 + payload.Length);
+        frame[1] = 0xD5; frame[2] = 0xF5;
+        Array.Copy(payload, 0, frame, 3, payload.Length);
+        int s = 0; for (int i = 0; i < frame.Length - 1; i++) s += frame[i]; frame[^1] = (byte)s;
+        foreach (byte tx in frame) { await logging.WriteAsync(new[] { tx }); await RB(); }
+        var resp = new List<byte>();
+        int idle = 0; while (idle < 6) { int b = await RB(); if (b < 0) { idle++; } else { resp.Add((byte)b); idle = 0; } }
+        return resp.Count >= 5 ? resp.GetRange(3, resp.Count - 4).ToArray() : resp.ToArray();
+    }
+
+    try
+    {
+        Console.WriteLine("Connect 0x33 + unlock (OBD)...");
+        await sagem.ConnectAsync();
+        await sagem.UnlockAsync(SecurityLevel.Read);
+        Console.WriteLine("Re-init 0xD5 + handshake...");
+        await new KLineFiveBaudInitializer().InitializeAsync(transport, 0xD5);
+        int sync = -1; for (int i = 0; i < 48 && sync != 0x55; i++) sync = await RB();
+        int kw1 = await RB(), kw2 = await RB();
+        Console.WriteLine($"  KW 0x{kw1:X2} 0x{kw2:X2}");
+        await Task.Delay(30);
+        await logging.WriteAsync(new[] { (byte)(kw2 ^ 0xFF) });
+        await RB(); int invAddr = await RB();
+        Console.WriteLine($"  ~addr=0x{invAddr:X2}");
+
+        Console.WriteLine("0xD5 seed request (27 05)...");
+        byte[] sresp = await SendD5(new byte[] { 0x27, 0x05 });
+        Console.WriteLine($"  seed resp: {BitConverter.ToString(sresp)}");
+        if (sresp.Length >= 3 && sresp[0] == 0x67)
+        {
+            int seed = (sresp[^2] << 8) | sresp[^1]; // seed = trailing 2 bytes of the response payload
+            int key = (seed * 0xFA52) & 0xFFFF;
+            Console.WriteLine($"  seed=0x{seed:X4} -> key (x0xFA52)=0x{key:X4}; submitting key (27 06, single attempt)...");
+            byte[] kresp = await SendD5(new byte[] { 0x27, 0x06, (byte)(key >> 8), (byte)key });
+            Console.WriteLine($"  key resp: {BitConverter.ToString(kresp)}");
+            if (kresp.Length >= 1 && kresp[0] == 0x67)
+            {
+                Console.WriteLine($"  *** 0xD5 UNLOCKED *** reading {len} bytes @ 0x{addr:X6}...");
+                byte[] rresp = await SendD5(new byte[] { 0x23, (byte)(addr >> 16), (byte)(addr >> 8), (byte)addr, (byte)len, 0x00 });
+                Console.WriteLine($"  READ RESP: {BitConverter.ToString(rresp)}");
+            }
+        }
+        Console.WriteLine("\n*** tuned5 done ***");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"tuned5 error: {ex.GetType().Name}: {ex.Message}");
+    }
+    return;
+}
+
 var session = new KLineObdSession(transport, transport); // same object is transport + break line
 
 try
