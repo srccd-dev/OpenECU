@@ -1,3 +1,4 @@
+using OpenEcu.Core.Adapters;
 using OpenEcu.Core.Memory;
 using OpenEcu.Core.Obd;
 using OpenEcu.Core.Security;
@@ -78,6 +79,97 @@ if (mode == "readmem")
     catch (Exception ex)
     {
         Console.WriteLine($"readmem error: {ex.GetType().Name}: {ex.Message}");
+    }
+    return;
+}
+
+if (mode == "initd5")
+{
+    var logging = new LoggingTransport(transport);
+    logging.BytesWritten += b => Console.WriteLine($"  TX {BitConverter.ToString(b)}");
+    logging.BytesRead    += b => Console.WriteLine($"  RX {BitConverter.ToString(b)}");
+    await using var sagem = new SagemSession(logging, transport);
+    try
+    {
+        Console.WriteLine("Connecting (0x33 OBD) + unlocking (SecurityAccess)...");
+        await sagem.ConnectAsync();
+        await sagem.UnlockAsync(SecurityLevel.Read);
+        Console.WriteLine("Unlocked. Re-initializing the K-line at 0xD5 (5-baud slow init, ~2.2s)...");
+        var initr = new KLineFiveBaudInitializer();
+        await initr.InitializeAsync(transport, 0xD5);
+        Console.WriteLine("0xD5 init complete. Capturing response bytes (keywords reveal the session header)...");
+        var buf = new byte[1];
+        int idle = 0;
+        while (idle < 10)
+        {
+            int n = await logging.ReadAsync(buf);
+            if (n == 0) { idle++; await Task.Delay(40); } else { idle = 0; }
+        }
+        Console.WriteLine("\n*** 0xD5 capture done ***");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"initd5 error: {ex.GetType().Name}: {ex.Message}");
+    }
+    return;
+}
+
+if (mode == "readd5")
+{
+    int addr = args.Length > 2 ? Convert.ToInt32(args[2], 16) : 0x000000;
+    int len  = args.Length > 3 ? int.Parse(args[3]) : 32;
+    var logging = new LoggingTransport(transport);
+    logging.BytesWritten += b => Console.WriteLine($"  TX {BitConverter.ToString(b)}");
+    logging.BytesRead    += b => Console.WriteLine($"  RX {BitConverter.ToString(b)}");
+    await using var sagem = new SagemSession(logging, transport);
+
+    async Task<int> ReadByte() { var b = new byte[1]; int n = await logging.ReadAsync(b); return n > 0 ? b[0] : -1; }
+
+    try
+    {
+        Console.WriteLine("Connect 0x33 + unlock...");
+        await sagem.ConnectAsync();
+        await sagem.UnlockAsync(SecurityLevel.Read);
+        Console.WriteLine("Re-init at 0xD5...");
+        await new KLineFiveBaudInitializer().InitializeAsync(transport, 0xD5);
+
+        int sync = -1;
+        for (int i = 0; i < 48 && sync != 0x55; i++) sync = await ReadByte();
+        int kw1 = await ReadByte();
+        int kw2 = await ReadByte();
+        Console.WriteLine($"  sync=0x{sync:X2} kw1=0x{kw1:X2} kw2=0x{kw2:X2}");
+
+        await Task.Delay(30); // W4
+        int invKw2 = kw2 ^ 0xFF;
+        await logging.WriteAsync(new[] { (byte)invKw2 });
+        int echo = await ReadByte();
+        int invAddr = await ReadByte();
+        Console.WriteLine($"  sent ~kw2=0x{invKw2:X2}, echo=0x{echo:X2}, ~addr=0x{invAddr:X2} (expect 0x2A)");
+
+        byte[] payload = { 0x23, (byte)(addr >> 16), (byte)(addr >> 8), (byte)addr, (byte)len, 0x00 };
+        var frame = new byte[3 + payload.Length + 1];
+        frame[0] = (byte)(0x80 + payload.Length); // KWP=false: length folded into the format byte
+        frame[1] = 0xD5;
+        frame[2] = 0xF5;
+        Array.Copy(payload, 0, frame, 3, payload.Length);
+        int sum = 0; for (int i = 0; i < frame.Length - 1; i++) sum += frame[i];
+        frame[^1] = (byte)sum;
+
+        Console.WriteLine($"Read {len} bytes @ 0x{addr:X6} over D5/F5 frame {BitConverter.ToString(frame)}...");
+        foreach (byte tx in frame) // echo-locked send
+        {
+            await logging.WriteAsync(new[] { tx });
+            int e = await ReadByte();
+            if (e != tx) Console.WriteLine($"  (echo mismatch: sent 0x{tx:X2} got 0x{e:X2})");
+        }
+        Console.WriteLine("Response:");
+        int idle = 0;
+        while (idle < 12) { int b = await ReadByte(); if (b < 0) { idle++; await Task.Delay(40); } else idle = 0; }
+        Console.WriteLine("\n*** readd5 done ***");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"readd5 error: {ex.GetType().Name}: {ex.Message}");
     }
     return;
 }
