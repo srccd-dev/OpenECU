@@ -8,7 +8,7 @@ namespace OpenEcu.Core.Obd;
 /// A live ISO9141-2 OBD-II session over a K-line cable: 5-baud init, keyword handshake,
 /// echo-locked transmit, read-until-idle, and OBD decode. Caller opens the transport first.
 /// </summary>
-public sealed class KLineObdSession : IObdSession
+public sealed class KLineObdSession : IObdSession, IObdRequestChannel
 {
     private readonly IEcuTransport _transport;
     private readonly IBreakLine _breakLine;
