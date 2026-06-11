@@ -11,7 +11,7 @@ public class MainViewModelTests
     private sealed class FakeFactory : IConnectionFactory
     {
         public FakeObdSession Ecu { get; } = new();
-        public LiveConnection Create(string portName)
+        public LiveConnection Create(string portName, AdapterKind kind = AdapterKind.Cable)
         {
             var log = new LoggingTransport(new SimulatedTransport());
             return new LiveConnection(new LiveDataService(Ecu), log);

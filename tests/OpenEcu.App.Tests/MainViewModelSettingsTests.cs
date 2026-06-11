@@ -10,7 +10,7 @@ public class MainViewModelSettingsTests
 {
     private sealed class NullFactory : IConnectionFactory
     {
-        public LiveConnection Create(string portName) =>
+        public LiveConnection Create(string portName, AdapterKind kind = AdapterKind.Cable) =>
             new(new LiveDataService(new FakeObdSession()), new LoggingTransport(new SimulatedTransport()));
     }
 
@@ -52,6 +52,22 @@ public class MainViewModelSettingsTests
             vm.RacingMode = true;
             var reloaded = new MainViewModel(new NullFactory(), () => Array.Empty<string>(), path);
             reloaded.RacingMode.Should().BeTrue();
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    [Fact]
+    public void Adapter_defaults_to_cable_and_persists()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"oe-{Guid.NewGuid():N}.json");
+        try
+        {
+            var vm = new MainViewModel(new NullFactory(), () => Array.Empty<string>(), path);
+            vm.SelectedAdapter.Should().Be(AdapterKind.Cable);
+
+            vm.SelectedAdapter = AdapterKind.Elm327;
+            var reloaded = new MainViewModel(new NullFactory(), () => Array.Empty<string>(), path);
+            reloaded.SelectedAdapter.Should().Be(AdapterKind.Elm327);
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }

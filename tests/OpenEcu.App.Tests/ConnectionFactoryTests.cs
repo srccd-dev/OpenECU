@@ -15,4 +15,12 @@ public class ConnectionFactoryTests
         conn.Log.Should().NotBeNull();
         conn.Log.IsOpen.Should().BeFalse();
     }
+
+    [Fact]
+    public void Create_builds_an_elm327_connection_without_opening()
+    {
+        var conn = new ConnectionFactory().Create("COM_NONEXISTENT", AdapterKind.Elm327);
+        conn.Service.Should().NotBeNull();
+        conn.Log.IsOpen.Should().BeFalse();
+    }
 }
