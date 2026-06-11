@@ -60,9 +60,16 @@ if (mode == "readmem")
         await sagem.ConnectAsync();
         Console.WriteLine("Unlocking (SecurityAccess 27 03 02)...");
         await sagem.UnlockAsync(SecurityLevel.Read);
-        Console.WriteLine("StartDiagnosticSession (31 90 11)...");
-        ObdResponse diag = await sagem.StartDiagnosticAsync();
-        Console.WriteLine($"  start-diag reply: SID 0x{diag.ServiceId:X2} [{BitConverter.ToString(diag.Payload)}]");
+        Console.WriteLine("StartDiagnosticSession (31 90 11) [informational, non-fatal]...");
+        try
+        {
+            ObdResponse diag = await sagem.StartDiagnosticAsync();
+            Console.WriteLine($"  start-diag reply: SID 0x{diag.ServiceId:X2} [{BitConverter.ToString(diag.Payload)}]");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  start-diag no/invalid reply ({ex.GetType().Name}) — continuing straight to read (matches decompiled flow).");
+        }
         Console.WriteLine($"Reading {len} bytes @ 0x{addr:X6} (ReadMemoryByAddress 0x23)...");
         MemoryImage image = await sagem.ReadMemoryAsync(addr, len);
         Console.WriteLine($"\n  {BitConverter.ToString(image.Slice(addr, len).ToArray())}");
