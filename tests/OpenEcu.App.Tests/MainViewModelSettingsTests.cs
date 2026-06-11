@@ -39,4 +39,20 @@ public class MainViewModelSettingsTests
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
+
+    [Fact]
+    public void Racing_mode_defaults_off_and_persists()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"oe-{Guid.NewGuid():N}.json");
+        try
+        {
+            var vm = new MainViewModel(new NullFactory(), () => Array.Empty<string>(), path);
+            vm.RacingMode.Should().BeFalse();
+
+            vm.RacingMode = true;
+            var reloaded = new MainViewModel(new NullFactory(), () => Array.Empty<string>(), path);
+            reloaded.RacingMode.Should().BeTrue();
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
 }

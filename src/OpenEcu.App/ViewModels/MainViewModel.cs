@@ -25,6 +25,7 @@ public sealed partial class MainViewModel : ObservableObject
         _settings = AppSettings.Load(_settingsPath);
         _darkMode = _settings.DarkMode;
         _accent = _settings.Accent;
+        _racingMode = _settings.RacingMode;
         RefreshPorts();
     }
 
@@ -35,11 +36,13 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _status = "Disconnected";
     [ObservableProperty] private bool _darkMode;
     [ObservableProperty] private string _accent = "teal";
+    [ObservableProperty] private bool _racingMode;
 
     public IReadOnlyList<string> Accents => AppSettings.Accents;
 
     partial void OnDarkModeChanged(bool value) { _settings.DarkMode = value; _settings.Save(_settingsPath); }
     partial void OnAccentChanged(string value) { _settings.Accent = value; _settings.Save(_settingsPath); }
+    partial void OnRacingModeChanged(bool value) { _settings.RacingMode = value; _settings.Save(_settingsPath); }
 
     /// <summary>The connected live data service (null until connected). Views bind metrics from it.</summary>
     public LiveDataService? Live => _connection?.Service;
