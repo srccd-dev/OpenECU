@@ -214,15 +214,19 @@ if (mode == "tuned5")
         await RB(); int invAddr = await RB();
         Console.WriteLine($"  ~addr=0x{invAddr:X2}");
 
-        Console.WriteLine("0xD5 seed request (27 05)...");
-        byte[] sresp = await SendD5(new byte[] { 0x27, 0x05 });
+        Console.WriteLine("0xD5 identification read (21 80) — REQUIRED before SecurityAccess is offered...");
+        byte[] idresp = await SendD5(new byte[] { 0x21, 0x80 });
+        Console.WriteLine($"  ident resp: {BitConverter.ToString(idresp)}");
+
+        Console.WriteLine("0xD5 seed request (27 03 02)...");
+        byte[] sresp = await SendD5(new byte[] { 0x27, 0x03, 0x02 });
         Console.WriteLine($"  seed resp: {BitConverter.ToString(sresp)}");
-        if (sresp.Length >= 3 && sresp[0] == 0x67)
+        if (sresp.Length >= 5 && sresp[0] == 0x67)
         {
             int seed = (sresp[^2] << 8) | sresp[^1]; // seed = trailing 2 bytes of the response payload
             int key = (seed * 0xFA52) & 0xFFFF;
-            Console.WriteLine($"  seed=0x{seed:X4} -> key (x0xFA52)=0x{key:X4}; submitting key (27 06, single attempt)...");
-            byte[] kresp = await SendD5(new byte[] { 0x27, 0x06, (byte)(key >> 8), (byte)key });
+            Console.WriteLine($"  seed=0x{seed:X4} -> key (x0xFA52)=0x{key:X4}; submitting key (27 03 02 KH KL, single attempt)...");
+            byte[] kresp = await SendD5(new byte[] { 0x27, 0x03, 0x02, (byte)(key >> 8), (byte)key });
             Console.WriteLine($"  key resp: {BitConverter.ToString(kresp)}");
             if (kresp.Length >= 1 && kresp[0] == 0x67)
             {
