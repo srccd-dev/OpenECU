@@ -1,3 +1,4 @@
+using OpenEcu.Core.Memory;
 using OpenEcu.Core.Obd;
 using OpenEcu.Core.Security;
 using OpenEcu.Core.Transport;
@@ -41,6 +42,35 @@ if (mode == "securityaccess")
     catch (Exception ex)
     {
         Console.WriteLine($"Security-access error: {ex.GetType().Name}: {ex.Message}");
+    }
+    return;
+}
+
+if (mode == "readmem")
+{
+    int addr = args.Length > 2 ? Convert.ToInt32(args[2], 16) : 0x000000;
+    int len  = args.Length > 3 ? int.Parse(args[3]) : 64;
+    var logging = new LoggingTransport(transport);
+    logging.BytesWritten += b => Console.WriteLine($"  TX {BitConverter.ToString(b)}");
+    logging.BytesRead    += b => Console.WriteLine($"  RX {BitConverter.ToString(b)}");
+    await using var sagem = new SagemSession(logging, transport);
+    try
+    {
+        Console.WriteLine("Connecting (5-baud init + keyword handshake)...");
+        await sagem.ConnectAsync();
+        Console.WriteLine("Unlocking (SecurityAccess 27 03 02)...");
+        await sagem.UnlockAsync(SecurityLevel.Read);
+        Console.WriteLine("StartDiagnosticSession (31 90 11)...");
+        ObdResponse diag = await sagem.StartDiagnosticAsync();
+        Console.WriteLine($"  start-diag reply: SID 0x{diag.ServiceId:X2} [{BitConverter.ToString(diag.Payload)}]");
+        Console.WriteLine($"Reading {len} bytes @ 0x{addr:X6} (ReadMemoryByAddress 0x23)...");
+        MemoryImage image = await sagem.ReadMemoryAsync(addr, len);
+        Console.WriteLine($"\n  {BitConverter.ToString(image.Slice(addr, len).ToArray())}");
+        Console.WriteLine("\n*** READ OK ***");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"readmem error: {ex.GetType().Name}: {ex.Message}");
     }
     return;
 }
