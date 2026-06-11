@@ -99,4 +99,18 @@ public class KLineObdSessionTests
 
         dtcs.Should().Equal("P1502");
     }
+
+    [Fact]
+    public async Task ClearDtcsAsync_sends_mode_04_and_accepts_the_positive_response()
+    {
+        // Mode 04 positive response is service id 0x44.
+        var ecu = new FakeEcu(new()
+        {
+            ["04"] = new byte[] { 0x48, 0x6B, 0xD1, 0x44, 0xC8 }, // 0x48+0x6B+0xD1+0x44 = 0x1C8 -> 0xC8
+        }, connected: true);
+        await ecu.OpenAsync();
+        var session = new KLineObdSession(ecu, ecu, delay: NoDelay);
+
+        await session.ClearDtcsAsync(); // must not throw
+    }
 }

@@ -14,7 +14,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <TextBlock Text="(no stored codes)" Opacity="0.5" IsVisible="{Binding !Dtcs.Count}" />
-        <Button Content="Clear codes" IsEnabled="{Binding CanClearCodes}" Margin="0,8,0,0" />
+        <Button Content="Clear codes" Command="{Binding ClearCodesCommand}" IsEnabled="{Binding CanClearCodes}" Margin="0,8,0,0" />
       </StackPanel>
     </Border>
 

@@ -39,5 +39,14 @@ public sealed class FakeObdSession : IObdSession
         return Task.FromResult(Dtcs);
     }
 
+    public int ClearCalls { get; private set; }
+
+    public Task ClearDtcsAsync(CancellationToken ct = default)
+    {
+        ClearCalls++;
+        Dtcs = Array.Empty<string>();
+        return Task.CompletedTask;
+    }
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

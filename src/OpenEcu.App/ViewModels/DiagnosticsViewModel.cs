@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using OpenEcu.App.Services;
 
 namespace OpenEcu.App.ViewModels;
 
-/// <summary>The full live PID table + fault codes. Clear-codes (Mode 04) is a v2 stub.</summary>
-public sealed class DiagnosticsViewModel
+/// <summary>The full live PID table + fault codes, with Mode 04 clear-codes.</summary>
+public sealed partial class DiagnosticsViewModel : ObservableObject
 {
     private readonly LiveDataService _live;
 
@@ -13,6 +15,8 @@ public sealed class DiagnosticsViewModel
     public ObservableCollection<MetricViewModel> Metrics => _live.Metrics;
     public IReadOnlyList<string> Dtcs => _live.Dtcs;
 
-    /// <summary>Mode 04 clear-DTCs is not implemented in v1 (read-only).</summary>
-    public bool CanClearCodes => false;
+    public bool CanClearCodes => true;
+
+    [RelayCommand]
+    private Task ClearCodesAsync() => _live.ClearDtcsAsync();
 }
