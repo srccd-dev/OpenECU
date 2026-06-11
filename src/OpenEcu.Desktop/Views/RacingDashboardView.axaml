@@ -8,7 +8,8 @@
     <c:AnalogTachometer Grid.Column="0" Width="320" Height="320"
                         Value="{Binding Rpm.Value, FallbackValue=0}"
                         MaxRpm="{Binding Tach.MaxRpm}" RedlineRpm="{Binding Tach.RedlineRpm}"
-                        Accent="{DynamicResource AppAccentBrush}" />
+                        Accent="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
 
     <StackPanel Grid.Column="2" Spacing="14" VerticalAlignment="Center">
       <Grid ColumnDefinitions="*,Auto">
